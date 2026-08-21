@@ -52,6 +52,7 @@ else
 fi
 ./scripts/feeds install -a -p awg
 ./scripts/feeds install -a -p podkop
+./scripts/feeds install luci luci-ssl-openssl luci-app-firewall luci-app-package-manager luci-app-ttyd luci-app-commands luci-app-statistics luci-app-sqm luci-app-upnp luci-proto-wireguard luci-proto-ppp mtr-json iputils-ping iputils-tracepath
 cp "$PROJECT_DIR/configs/gl-mt6000.config" .config
 make defconfig
 make download -j"$JOBS"

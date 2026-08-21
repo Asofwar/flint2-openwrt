@@ -2,35 +2,119 @@
 set -Eeuo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$PROJECT_DIR/scripts/versions.env"
 BUILDROOT="${BUILDROOT:-$PROJECT_DIR/.work/openwrt}"
 IMAGE_DIR="$BUILDROOT/bin/targets/mediatek/filogic"
 CONFIG="$BUILDROOT/.config"
+OUT="$PROJECT_DIR/artifacts"
 
 fail() { echo "VERIFY FAILED: $*" >&2; exit 1; }
+config_enabled() {
+  grep -qx "CONFIG_PACKAGE_$1=y" "$CONFIG" || fail "package not selected: $1"
+}
 has_apk() {
   test -n "$(find "$BUILDROOT/bin" -type f -name "$1" -print -quit)" || fail "missing built APK: $1"
+}
+manifest_has() {
+  grep -q "^$1 - " "$MANIFEST" || fail "image manifest lacks package: $1"
 }
 
 test -f "$CONFIG" || fail "missing resolved .config"
 test -d "$IMAGE_DIR" || fail "missing filogic image directory"
+MANIFEST="$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl-mt6000*.manifest' -print -quit)"
+SYSUPGRADE="$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl-mt6000*sysupgrade.bin' -print -quit)"
+FACTORY="$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl-mt6000*factory.bin' -print -quit)"
+KERNEL_CONFIG="$(find "$BUILDROOT/build_dir" -path "*/linux-mediatek_filogic/linux-$OPENWRT_KERNEL/.config" -print -quit)"
+test -n "$MANIFEST" || fail "GL-MT6000 manifest absent"
+test -n "$SYSUPGRADE" || fail "GL-MT6000 sysupgrade image absent"
+test -n "$FACTORY" || fail "GL-MT6000 factory image absent"
+test -n "$KERNEL_CONFIG" || fail "resolved kernel config absent"
+test -f "$IMAGE_DIR/sha256sums" || fail "upstream SHA256 file absent"
+
+grep -qx 'CONFIG_TARGET_mediatek=y' "$CONFIG" || fail "wrong target"
+grep -qx 'CONFIG_TARGET_mediatek_filogic=y' "$CONFIG" || fail "wrong subtarget"
 grep -qx 'CONFIG_TARGET_mediatek_filogic_DEVICE_glinet_gl-mt6000=y' "$CONFIG" || fail "wrong device"
-grep -qx 'CONFIG_PACKAGE_kmod-amneziawg=y' "$CONFIG" || fail "AmneziaWG kmod was not selected"
-grep -qx 'CONFIG_PACKAGE_luci-proto-amneziawg=y' "$CONFIG" || fail "AmneziaWG LuCI protocol was not selected"
-grep -qx 'CONFIG_PACKAGE_luci-i18n-amneziawg-ru=y' "$CONFIG" || fail "AmneziaWG Russian translation was not selected"
-grep -qx 'CONFIG_PACKAGE_podkop=y' "$CONFIG" || fail "Podkop was not selected"
-grep -qx 'CONFIG_PACKAGE_luci-app-podkop=y' "$CONFIG" || fail "Podkop LuCI was not selected"
+rootfs_mib="$(sed -n 's/^CONFIG_TARGET_ROOTFS_PARTSIZE=\([0-9][0-9]*\)$/\1/p' "$CONFIG")"
+test -n "$rootfs_mib" || fail "rootfs size limit is undefined"
+test "$(stat -c '%s' "$SYSUPGRADE")" -le "$((rootfs_mib * 1024 * 1024))" || fail "sysupgrade image exceeds configured rootfs size"
+
+config_enabled luci
+config_enabled luci-ssl-openssl
+config_enabled luci-app-firewall
+config_enabled luci-app-package-manager
+config_enabled luci-app-ttyd
+config_enabled luci-app-commands
+config_enabled luci-app-statistics
+config_enabled luci-app-sqm
+config_enabled luci-app-upnp
+config_enabled uhttpd
+config_enabled uhttpd-mod-ubus
+config_enabled rpcd
 grep -qx 'CONFIG_LUCI_LANG_ru=y' "$CONFIG" || fail "Russian LuCI language was not selected"
-grep -qx 'CONFIG_PACKAGE_luci-i18n-podkop-ru=y' "$CONFIG" || fail "Podkop Russian translation was not selected"
-grep -qx 'CONFIG_PACKAGE_sing-box=y' "$CONFIG" || fail "full sing-box was not selected"
-grep -q '^# CONFIG_PACKAGE_sing-box-tiny is not set$' "$CONFIG" || fail "sing-box-tiny must not replace the full variant"
-has_apk 'kmod-amneziawg-*.apk'
+config_enabled firewall4
+config_enabled nftables-json
+config_enabled kmod-nft-tproxy
+config_enabled kmod-wireguard
+config_enabled wireguard-tools
+config_enabled luci-proto-wireguard
+config_enabled kmod-amneziawg
+config_enabled amneziawg-tools
+config_enabled luci-proto-amneziawg
+config_enabled luci-i18n-amneziawg-ru
+config_enabled podkop
+config_enabled luci-app-podkop
+config_enabled luci-i18n-podkop-ru
+config_enabled sing-box
+grep -q '^# CONFIG_PACKAGE_sing-box-tiny is not set$' "$CONFIG" || fail "sing-box-tiny replaced full sing-box"
+config_enabled kmod-mt7915e
+config_enabled kmod-mt7986-firmware
+config_enabled mt7986-wo-firmware
+config_enabled ppp
+config_enabled ppp-mod-pppoe
+config_enabled luci-proto-ppp
+config_enabled dnsmasq-full
+config_enabled odhcpd-ipv6only
+config_enabled wpad-openssl
+config_enabled ip-full
+config_enabled ip-bridge
+config_enabled ethtool
+config_enabled tcpdump-mini
+config_enabled mtr-json
+config_enabled iputils-ping
+config_enabled iputils-tracepath
+config_enabled bind-dig
+config_enabled ca-bundle
+config_enabled ca-certificates
+config_enabled curl
+config_enabled jq
+config_enabled coreutils-base64
+grep -qx 'CONFIG_BRIDGE_VLAN_FILTERING=y' "$KERNEL_CONFIG" || fail "kernel bridge VLAN filtering is disabled"
+grep -qx 'CONFIG_VLAN_8021Q=y' "$KERNEL_CONFIG" || fail "kernel 802.1Q VLAN support is disabled"
+
+has_apk "kmod-amneziawg-${OPENWRT_KERNEL}*.apk"
+has_apk 'amneziawg-tools-*.apk'
 has_apk 'luci-proto-amneziawg-*.apk'
 has_apk 'luci-i18n-amneziawg-ru-*.apk'
 has_apk 'podkop-*.apk'
 has_apk 'luci-app-podkop-*.apk'
 has_apk 'luci-i18n-podkop-ru-*.apk'
 has_apk 'sing-box-*.apk'
-test -n "$(find "$IMAGE_DIR" -maxdepth 1 -name '*gl-mt6000*sysupgrade.bin' -print -quit)" || fail "sysupgrade image absent"
-test -n "$(find "$IMAGE_DIR" -maxdepth 1 -name '*gl-mt6000*factory.bin' -print -quit)" || fail "factory image absent"
-test -f "$IMAGE_DIR/sha256sums" || fail "upstream SHA256 file absent"
-echo "VERIFY PASSED: GL-MT6000 images and required selected packages are present."
+
+for package in \
+  kmod-amneziawg amneziawg-tools luci-proto-amneziawg luci-i18n-amneziawg-ru \
+  podkop luci-app-podkop luci-i18n-podkop-ru sing-box kmod-nft-tproxy \
+  kmod-wireguard wireguard-tools luci-app-package-manager firewall4 nftables-json kmod-mt7915e \
+  kmod-mt7986-firmware mt7986-wo-firmware wpad-openssl ppp ppp-mod-pppoe luci-proto-ppp \
+  luci luci-ssl-openssl luci-app-firewall luci-app-package-manager luci-app-ttyd luci-app-commands \
+  luci-app-statistics luci-app-sqm luci-app-upnp uhttpd uhttpd-mod-ubus rpcd dnsmasq-full odhcpd-ipv6only \
+  ip-full ip-bridge ethtool tcpdump-mini mtr-json iputils-ping iputils-tracepath bind-dig ca-bundle ca-certificates \
+  curl jq coreutils-base64; do
+  manifest_has "$package"
+done
+
+for required in config.buildinfo feeds.buildinfo version.buildinfo packages.manifest openwrt-sha256sums BUILD_INFO.txt SHA256SUMS; do
+  test -f "$OUT/$required" || fail "missing collected artifact: $required"
+done
+(cd "$OUT" && sha256sum -c SHA256SUMS >/dev/null) || fail "artifact SHA256SUMS mismatch"
+
+echo "VERIFY PASSED: GL-MT6000 image, package set, kernel ABI package and collected metadata are consistent."

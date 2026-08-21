@@ -14,6 +14,9 @@
 | MT7986/MT7915 firmware | OpenWrt v25.12.5 device packages | upstream | yes | `kmod-mt7986-firmware`, `mt7986-wo-firmware`, `kmod-mt7915e` are device-native | low |
 | WED/PPE/RSS | OpenWrt v25.12.5 | upstream | no forced toggle | preserve upstream defaults; acceleration can conflict with policy routing/TProxy | medium |
 | pesa1234 `next-r4.9.2.rss.mtk` | pesa1234/openwrt `9d46f811…` | out-of-tree, kernel 4.9 line | reference only | not ABI-compatible with Linux 6.12 and unsuitable as a broad backport | high |
+| pesa1234/mt76 `018f6031…` | standalone vendor-oriented mt76 tree | out-of-tree | no | mixing it with upstream mac80211/kernel would break the single-ABI rule | high |
+| pesa1234/luci `77dad3f3…` | custom LuCI fork | out-of-tree | no | no hardware control is imported without a 6.12-compatible backend and runtime test | medium/high |
+| pesa1234/MT6000_cust_build `c5134874…` | build helper/reference | out-of-tree | no | useful to compare options, but not a patch source for a different release/kernel | medium |
 | 2.4 GHz 256-QAM / iBF / EDCCA GUI | pesa1234 trees | vendor/experimental | no | no validated 6.12-compatible implementation or regulatory-safe control plane | medium/high |
 | AmneziaWG kernel module | awg-openwrt `98b9eaf2…` | external package source | yes | compiled by this buildroot against its exact kernel ABI | medium |
 | Podkop 0.7.22 | itdoginfo/podkop `c0a2736b…` + local compatibility patch | external package source | yes | its dependencies/conflicts are upstream; LuCI registration is adapted for 25.12 | medium |
@@ -27,6 +30,12 @@
 Ethernet патчи не переносятся без отдельного минимального diff и стендовых
 регрессионных тестов. Это исключает смешивание несовместимых mt76/mac80211,
 firmware и kernel ABI.
+
+Классификация результата: часть базового MT7986/mt76 уже есть upstream;
+полезных безопасных backport для Linux 6.12 не найдено; RSS/WED/PPE и расширенный
+Wi-Fi control относятся к pesa-specific или experimental изменениям; 4.9-based
+patches устарели для этой сборки. Поэтому число перенесённых Pesa patch равно
+нулю: это документированное решение, а не пропуск обязательной интеграции.
 
 ## Podkop и routing
 
