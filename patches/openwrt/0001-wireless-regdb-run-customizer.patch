@@ -1,0 +1,13 @@
+diff --git a/package/firmware/wireless-regdb/Makefile b/package/firmware/wireless-regdb/Makefile
+index d895d98..7db582a 100644
+--- a/package/firmware/wireless-regdb/Makefile
++++ b/package/firmware/wireless-regdb/Makefile
+@@ -23,6 +23,8 @@ define Package/wireless-regdb
+ endef
+ 
+ define Build/Compile
++	$(STAGING_DIR_HOST)/bin/$(PYTHON) $(CURDIR)/customize-wireless-regdb.py $(PKG_BUILD_DIR)/db.txt $(PKG_BUILD_DIR)/db.txt.custom
++	mv $(PKG_BUILD_DIR)/db.txt.custom $(PKG_BUILD_DIR)/db.txt
+ 	$(STAGING_DIR_HOST)/bin/$(PYTHON) $(PKG_BUILD_DIR)/db2fw.py $(PKG_BUILD_DIR)/regulatory.db $(PKG_BUILD_DIR)/db.txt
+ endef
+ 

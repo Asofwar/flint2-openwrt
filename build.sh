@@ -23,6 +23,18 @@ if [[ "$(git -C "$BUILDROOT" rev-parse HEAD)" != "$OPENWRT_COMMIT" ]]; then
   exit 1
 fi
 
+REGDB_PACKAGE_DIR="$BUILDROOT/package/firmware/wireless-regdb"
+REGDB_PATCH="$PROJECT_DIR/patches/openwrt/0001-wireless-regdb-run-customizer.patch"
+install -D -m 0755 "$PROJECT_DIR/scripts/customize-wireless-regdb.py" "$REGDB_PACKAGE_DIR/customize-wireless-regdb.py"
+if git -C "$BUILDROOT" apply --reverse --check "$REGDB_PATCH" 2>/dev/null; then
+  :
+elif git -C "$BUILDROOT" apply --check "$REGDB_PATCH" 2>/dev/null; then
+  git -C "$BUILDROOT" apply "$REGDB_PATCH"
+else
+  echo "wireless-regdb customization patch does not apply to the pinned OpenWrt source" >&2
+  exit 1
+fi
+
 if ! grep -Fqx "src-git-full awg $AMNEZIAWG_FEED_REPOSITORY^$AMNEZIAWG_FEED_COMMIT" "$BUILDROOT/feeds.conf.default"; then
 cat >> "$BUILDROOT/feeds.conf.default" <<EOF
 src-git-full awg $AMNEZIAWG_FEED_REPOSITORY^$AMNEZIAWG_FEED_COMMIT
@@ -87,10 +99,12 @@ AMNEZIAWG_VERSION=$AMNEZIAWG_KERNEL_MODULE_VERSION
 AMNEZIAWG_COMMIT=$AMNEZIAWG_FEED_COMMIT
 PODKOP_VERSION=$PODKOP_VERSION
 PODKOP_COMMIT=$PODKOP_COMMIT
+CUSTOM_WIRELESS_REGDB=1
 EOF
 make download -j"$JOBS"
 make -j"$JOBS" V=s
 popd >/dev/null
 
+BUILDROOT="$BUILDROOT" bash "$PROJECT_DIR/scripts/verify-custom-regdb.sh"
 BUILDROOT="$BUILDROOT" "$PROJECT_DIR/scripts/collect-artifacts.sh"
 BUILDROOT="$BUILDROOT" "$PROJECT_DIR/scripts/verify-build.sh"
