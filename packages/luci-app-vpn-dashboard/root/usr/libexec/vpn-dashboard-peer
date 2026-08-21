@@ -1,0 +1,264 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+die() {
+	echo "vpn-dashboard-peer: $*" >&2
+	exit 1
+}
+
+valid_id() {
+	case "$1" in ''|*[!A-Za-z0-9_]* ) return 1;; esac
+	[ "${#1}" -le 40 ]
+}
+
+valid_name() {
+	case "$1" in ''|*[!A-Za-z0-9_.-]* ) return 1;; esac
+	[ "${#1}" -le 32 ]
+}
+
+secret_file() {
+	printf '/etc/vpn-dashboard/peers/%s' "$1"
+}
+
+read_peer_secret() {
+	local file
+	file="$(secret_file "$1")"
+	[ -f "$file" ] || return 1
+	peer_private_key="$(sed -n 's/^private_key=//p' "$file")"
+	peer_preshared_key="$(sed -n 's/^preshared_key=//p' "$file")"
+	case "$peer_private_key" in ''|*[!A-Za-z0-9+/=]* ) return 1;; esac
+	case "$peer_preshared_key" in ''|*[!A-Za-z0-9+/=]* ) return 1;; esac
+}
+
+write_peer_secret() {
+	local id="$1" private_key="$2" preshared_key="$3" directory file
+	directory='/etc/vpn-dashboard/peers'
+	file="$(secret_file "$id")"
+	mkdir -p "$directory" || return 1
+	chmod 0700 "$directory" || return 1
+	( umask 077; printf 'private_key=%s\npreshared_key=%s\n' "$private_key" "$preshared_key" > "$file" ) || return 1
+	chmod 0600 "$file"
+}
+
+load_server() {
+	config_load vpn-dashboard
+	config_get server_interface main interface awg_server
+	config_get server_address main address 10.77.0.1/24
+	config_get endpoint_mode main endpoint_mode auto
+	config_get endpoint_host main endpoint_host
+}
+
+decimal_to_ip() {
+	awk -v n="$1" 'BEGIN { printf "%d.%d.%d.%d", int(n / 16777216) % 256, int(n / 65536) % 256, int(n / 256) % 256, n % 256 }'
+}
+
+peer_uses_address() {
+	local section="$1" candidate="$2" address
+	config_get address "$section" address
+	[ "${address%/*}" = "$candidate" ] && peer_address_in_use=1
+}
+
+next_peer_address() {
+	local NETWORK COUNT PREFIX candidate offset
+	eval "$(ipcalc.sh -d "$server_address")" || return 1
+	[ "$COUNT" -ge 8 ] || return 1
+	for offset in $(seq 2 $((COUNT - 2))); do
+		candidate="$(decimal_to_ip $((NETWORK + offset)))"
+		peer_address_in_use=''
+		config_foreach peer_uses_address peer "$candidate"
+		if [ -z "$peer_address_in_use" ]; then
+			printf '%s/%s\n' "$candidate" "$PREFIX"
+			return 0
+		fi
+	done
+	return 1
+}
+
+endpoint() {
+	local detected
+	case "$endpoint_mode" in
+		manual|ddns) printf '%s' "$endpoint_host";;
+		auto)
+			detected="$(ubus call network.interface.wan status 2>/dev/null | jsonfilter -e '@["ipv4-address"][0].address')"
+			printf '%s' "${detected:-$endpoint_host}"
+			;;
+		*) return 1;;
+	esac
+}
+
+validate_endpoint() {
+	case "$1" in ''|*[!A-Za-z0-9._:-]* ) return 1;; esac
+}
+
+server_public_key() {
+	local private_key
+	private_key="$(uci -q get network."$server_interface".private_key)"
+	[ -n "$private_key" ] || return 1
+	printf '%s\n' "$private_key" | awg pubkey
+}
+
+peer_config() {
+	local id="$1" section="peer_$1" address mode public_key
+	local server_key endpoint_value network_info lan_ip lan_mask lan_info allowed_ips key value awg_name
+	config_load vpn-dashboard
+	config_get public_key "$section" public_key
+	config_get address "$section" address
+	config_get mode "$section" mode full
+	read_peer_secret "$id" || return 1
+	[ -n "$public_key" ] && [ -n "$address" ] || return 1
+	server_key="$(server_public_key)" || return 1
+	endpoint_value="$(endpoint)" || return 1
+	validate_endpoint "$endpoint_value" || return 1
+	if [ "$mode" = 'home' ]; then
+		eval "$(ipcalc.sh "$server_address")" || return 1
+		allowed_ips="$NETWORK/$PREFIX"
+		lan_ip="$(uci -q get network.lan.ipaddr)"
+		lan_mask="$(uci -q get network.lan.netmask)"
+		if [ -n "$lan_ip" ] && [ -n "$lan_mask" ]; then
+			eval "$(ipcalc.sh "$lan_ip" "$lan_mask")" || return 1
+			allowed_ips="$allowed_ips, $NETWORK/$PREFIX"
+		fi
+	else
+		allowed_ips='0.0.0.0/0'
+	fi
+	printf '[Interface]\nPrivateKey = %s\nAddress = %s\nDNS = %s\nMTU = %s\n' \
+		"$peer_private_key" "$address" "${server_address%/*}" "$(uci -q get network."$server_interface".mtu || echo 1420)"
+	for key in awg_jc awg_jmin awg_jmax awg_s1 awg_s2 awg_s3 awg_s4 awg_h1 awg_h2 awg_h3 awg_h4 awg_i1 awg_i2 awg_i3 awg_i4 awg_i5; do
+		value="$(uci -q get network."$server_interface"."$key")"
+		case "$key" in
+			awg_jc) awg_name='Jc';; awg_jmin) awg_name='Jmin';; awg_jmax) awg_name='Jmax';;
+			awg_s1) awg_name='S1';; awg_s2) awg_name='S2';; awg_s3) awg_name='S3';; awg_s4) awg_name='S4';;
+			awg_h1) awg_name='H1';; awg_h2) awg_name='H2';; awg_h3) awg_name='H3';; awg_h4) awg_name='H4';;
+			awg_i1) awg_name='I1';; awg_i2) awg_name='I2';; awg_i3) awg_name='I3';; awg_i4) awg_name='I4';; awg_i5) awg_name='I5';;
+		esac
+		[ -n "$value" ] && printf '%s = %s\n' "$awg_name" "$value"
+	done
+	printf '\n[Peer]\nPublicKey = %s\nPresharedKey = %s\nEndpoint = %s:%s\nAllowedIPs = %s\nPersistentKeepalive = 25\n' \
+		"$server_key" "$peer_preshared_key" "$endpoint_value" "$(uci -q get network."$server_interface".listen_port || echo 51820)" "$allowed_ips"
+}
+
+apply_server() {
+	/etc/init.d/vpn-dashboard enable
+	/etc/init.d/vpn-dashboard restart
+}
+
+create_peer() {
+	local name="$1" mode="${2:-full}" id private_key public_key preshared_key address endpoint_value server_enabled
+	valid_name "$name" || die 'client name must contain only letters, digits, dot, dash or underscore'
+	case "$mode" in full|home) ;; *) die 'unknown client mode';; esac
+	load_server
+	config_get server_enabled main enabled 0
+	[ "$server_enabled" = '1' ] || die 'enable and apply the server configuration before creating a client'
+	endpoint_value="$(endpoint)"
+	validate_endpoint "$endpoint_value" || die 'configure a reachable manual, DDNS or WAN endpoint before exporting a client'
+	id="$(printf '%s' "$name" | tr '.-' '__')"
+	valid_id "$id" || die 'invalid client identifier'
+	uci -q get vpn-dashboard."peer_$id" >/dev/null && die 'client name already exists'
+	address="$(next_peer_address)" || die 'no free address in the configured server subnet'
+	umask 077
+	private_key="$(awg genkey)" || die 'cannot generate client key'
+	public_key="$(printf '%s\n' "$private_key" | awg pubkey)" || die 'cannot derive client public key'
+	preshared_key="$(awg genpsk)" || die 'cannot generate preshared key'
+	uci -q set vpn-dashboard."peer_$id"='peer'
+	uci -q set vpn-dashboard."peer_$id".name="$name"
+	uci -q set vpn-dashboard."peer_$id".address="$address"
+	uci -q set vpn-dashboard."peer_$id".public_key="$public_key"
+	uci -q set vpn-dashboard."peer_$id".enabled='1'
+	uci -q set vpn-dashboard."peer_$id".mode="$mode"
+	uci -q set vpn-dashboard."peer_$id".created="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+	write_peer_secret "$id" "$private_key" "$preshared_key" || die 'cannot store client secret'
+	uci -q commit vpn-dashboard
+	chmod 0600 /etc/config/vpn-dashboard
+	apply_server || die 'server configuration could not be applied'
+	peer_config "$id"
+}
+
+peer_status() {
+	local section="$1" id name address public_key enabled created handshake transfer now online rx tx
+	id="${section#peer_}"
+	config_get name "$section" name "$id"
+	config_get address "$section" address
+	config_get public_key "$section" public_key
+	config_get enabled "$section" enabled 1
+	config_get created "$section" created ''
+	handshake="$(awg show "$server_interface" latest-handshakes 2>/dev/null | awk -v key="$public_key" '$1 == key { print $2 }')"
+	transfer="$(awg show "$server_interface" transfer 2>/dev/null | awk -v key="$public_key" '$1 == key { print $2 " " $3 }')"
+	rx="${transfer%% *}"; tx="${transfer##* }"
+	[ "$rx" = "$transfer" ] && rx=0 && tx=0
+	[ -n "$handshake" ] || handshake=0
+	now="$(date +%s)"
+	online=0
+	[ "$handshake" -gt 0 ] 2>/dev/null && [ $((now - handshake)) -le 180 ] && online=1
+	[ -n "$peer_json_first" ] || printf ','
+	peer_json_first=1
+	printf '{"id":"%s","name":"%s","address":"%s","public_key":"%s","enabled":%s,"online":%s,"last_handshake":%s,"rx":%s,"tx":%s,"created":"%s"}' \
+		"$id" "$name" "$address" "$public_key" "$([ "$enabled" = 1 ] && echo true || echo false)" "$([ "$online" = 1 ] && echo true || echo false)" "$handshake" "$rx" "$tx" "$created"
+}
+
+status() {
+	load_server
+	peer_json_first=''
+	printf '{"peers":['
+	config_foreach peer_status peer
+	printf ']}\n'
+}
+
+dashboard_status() {
+	local source sources enabled policy wan_address wan_status cgnat
+	load_server
+	config_get enabled main enabled 0
+	config_get policy main podkop_policy same_as_lan
+	wan_status="$(ubus call network.interface.wan status 2>/dev/null)"
+	wan_address=''
+	[ -n "$wan_status" ] && wan_address="$(printf '%s' "$wan_status" | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null)"
+	cgnat=0
+	case "$wan_address" in
+		10.*|192.168.*|100.6[4-9].*|100.[7-9][0-9].*|100.1[0-1][0-9].*|100.12[0-7].*) cgnat=1;;
+		172.*)
+			case "${wan_address#172.}" in 1[6-9].*|2[0-9].*|3[0-1].*) cgnat=1;; esac
+			;;
+	esac
+	sources=''
+	for source in $(uci -q get podkop.settings.source_network_interfaces); do
+		case "$source" in *[!A-Za-z0-9_.-]*|'') continue;; esac
+		[ -n "$sources" ] && sources="$sources, "
+		sources="$sources$source"
+	done
+	printf '{"interface":"%s","server_enabled":%s,"policy":"%s","podkop_sources":"%s","wan_address":"%s","cgnat":%s}\n' \
+		"$server_interface" "$([ "$enabled" = 1 ] && echo true || echo false)" "$policy" "$sources" "$wan_address" "$cgnat"
+}
+
+set_enabled() {
+	local id="$1" enabled="$2"
+	valid_id "$id" || die 'invalid client identifier'
+	case "$enabled" in 0|1) ;; *) die 'enabled must be 0 or 1';; esac
+	uci -q get vpn-dashboard."peer_$id" >/dev/null || die 'client does not exist'
+	uci -q set vpn-dashboard."peer_$id".enabled="$enabled"
+	uci -q commit vpn-dashboard
+	chmod 0600 /etc/config/vpn-dashboard
+	apply_server
+}
+
+delete_peer() {
+	local id="$1"
+	valid_id "$id" || die 'invalid client identifier'
+	uci -q get vpn-dashboard."peer_$id" >/dev/null || die 'client does not exist'
+	uci -q delete vpn-dashboard."peer_$id"
+	rm -f "$(secret_file "$id")"
+	uci -q commit vpn-dashboard
+	chmod 0600 /etc/config/vpn-dashboard
+	apply_server
+}
+
+load_server
+case "$1" in
+	status) status;;
+	dashboard) dashboard_status;;
+	create) create_peer "$2" "$3";;
+	export) valid_id "$2" || die 'invalid client identifier'; peer_config "$2";;
+	qr) valid_id "$2" || die 'invalid client identifier'; peer_config "$2" | qrencode -t SVG -o - | base64 | tr -d '\n'; printf '\n';;
+	enable) set_enabled "$2" "$3";;
+	delete) delete_peer "$2";;
+	*) die 'unknown action';;
+esac

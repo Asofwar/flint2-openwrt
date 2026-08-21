@@ -1,0 +1,269 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: ru\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+msgid "VPN Dashboard"
+msgstr "Панель VPN"
+
+msgid "AmneziaWG Server"
+msgstr "Сервер AmneziaWG"
+
+msgid "Server settings"
+msgstr "Настройки сервера"
+
+msgid "Enable server"
+msgstr "Включить сервер"
+
+msgid "Server address"
+msgstr "Адрес сервера"
+
+msgid "Listen port"
+msgstr "Порт прослушивания"
+
+msgid "Allow Internet access"
+msgstr "Разрешить доступ в Интернет"
+
+msgid "Allow access to home LAN"
+msgstr "Разрешить доступ к домашней сети"
+
+msgid "Isolate VPN clients"
+msgstr "Изолировать VPN-клиентов"
+
+msgid "Traffic policy"
+msgstr "Политика трафика"
+
+msgid "Same as LAN / Podkop"
+msgstr "Как LAN / Podkop"
+
+msgid "Direct only"
+msgstr "Только напрямую"
+
+msgid "Apply server configuration"
+msgstr "Применить конфигурацию сервера"
+
+msgid "Apply and restart"
+msgstr "Применить и перезапустить"
+
+msgid "Server configuration applied."
+msgstr "Конфигурация сервера применена."
+
+msgid "Podkop source interfaces"
+msgstr "Исходные интерфейсы Podkop"
+
+msgid "Configure AmneziaWG server"
+msgstr "Настроить сервер AmneziaWG"
+
+msgid "Configure Podkop"
+msgstr "Настроить Podkop"
+
+msgid "AmneziaWG obfuscation"
+msgstr "Маскировка AmneziaWG"
+
+msgid "Client endpoint"
+msgstr "Конечная точка клиента"
+
+msgid "Auto-detected WAN address"
+msgstr "Автоматически определённый WAN-адрес"
+
+msgid "DDNS hostname"
+msgstr "Имя хоста DDNS"
+
+msgid "Manual hostname or IP"
+msgstr "Имя хоста или IP вручную"
+
+msgid "DDNS or manual endpoint"
+msgstr "DDNS или ручная конечная точка"
+
+msgid "Required for client export when the WAN address is not directly reachable. Configure a DDNS service on the standard Services page when using a hostname."
+msgstr "Нужна для экспорта клиента, если WAN-адрес недоступен напрямую. При использовании имени хоста настройте DDNS в стандартном разделе «Сервисы»."
+
+msgid "The server uses a standard netifd AmneziaWG interface, firewall4 and Podkop. Saving does not expose keys in this page."
+msgstr "Сервер использует стандартные netifd-интерфейс AmneziaWG, firewall4 и Podkop. Сохранение на этой странице не раскрывает ключи."
+
+msgid "Junk packet count. Leave unset when the provider does not supply a value."
+msgstr "Количество маскирующих пакетов. Оставьте пустым, если провайдер не указал значение."
+
+msgid "Minimum junk packet size."
+msgstr "Минимальный размер маскирующего пакета."
+
+msgid "Maximum junk packet size."
+msgstr "Максимальный размер маскирующего пакета."
+
+msgid "Handshake initiation junk header size."
+msgstr "Размер маскирующего заголовка инициации рукопожатия."
+
+msgid "Handshake response junk header size."
+msgstr "Размер маскирующего заголовка ответа рукопожатия."
+
+msgid "Cookie reply junk header size."
+msgstr "Размер маскирующего заголовка ответа cookie."
+
+msgid "Transport packet junk header size."
+msgstr "Размер маскирующего заголовка транспортного пакета."
+
+msgid "AmneziaWG handshake header parameter."
+msgstr "Параметр заголовка рукопожатия AmneziaWG."
+
+msgid "Optional AmneziaWG 2.0 parameter."
+msgstr "Необязательный параметр AmneziaWG 2.0."
+
+msgid "AmneziaWG remote clients"
+msgstr "Удалённые клиенты AmneziaWG"
+
+msgid "Clients are attached to the dedicated awg_server interface and inherit its firewall and Podkop policy. Status output never contains private or preshared keys."
+msgstr "Клиенты подключаются к выделенному интерфейсу awg_server и наследуют его firewall- и Podkop-политику. Статус никогда не содержит приватных или предварительно общих ключей."
+
+msgid "Add client"
+msgstr "Добавить клиента"
+
+msgid "Access profile"
+msgstr "Профиль доступа"
+
+msgid "Internet through Flint 2"
+msgstr "Интернет через Flint 2"
+
+msgid "Home network only"
+msgstr "Только домашняя сеть"
+
+msgid "The address is allocated automatically. The private key is shown only once in the following export step."
+msgstr "Адрес выделяется автоматически. Приватный ключ показывается только один раз на следующем шаге экспорта."
+
+msgid "Create client"
+msgstr "Создать клиента"
+
+msgid "Assigned IP"
+msgstr "Назначенный IP"
+
+msgid "Public key"
+msgstr "Публичный ключ"
+
+msgid "Last handshake"
+msgstr "Последнее рукопожатие"
+
+msgid "Show / download"
+msgstr "Показать / скачать"
+
+msgid "Show QR"
+msgstr "Показать QR"
+
+msgid "Revoke"
+msgstr "Отозвать"
+
+msgid "Revoke client: %s"
+msgstr "Отзыв клиента: %s"
+
+msgid "The client will lose access immediately after the server configuration is applied."
+msgstr "Клиент потеряет доступ сразу после применения конфигурации сервера."
+
+msgid "Client configuration: %s"
+msgstr "Конфигурация клиента: %s"
+
+msgid "New client configuration"
+msgstr "Конфигурация нового клиента"
+
+msgid "This configuration contains the client private key. Store it securely and do not share it."
+msgstr "Эта конфигурация содержит приватный ключ клиента. Храните её безопасно и никому не передавайте."
+
+msgid "Download .conf"
+msgstr "Скачать .conf"
+
+msgid "QR code: %s"
+msgstr "QR-код: %s"
+
+msgid "Client QR code"
+msgstr "QR-код клиента"
+
+msgid "Scan this code only on the trusted client that will use this VPN profile."
+msgstr "Сканируйте этот код только доверенным клиентом, который будет использовать этот VPN-профиль."
+
+msgid "The VPN server command failed."
+msgstr "Не удалось выполнить команду VPN-сервера."
+
+msgid "Unable to read VPN Dashboard state."
+msgstr "Не удалось получить состояние панели VPN."
+
+msgid "This page shows only operational state. Private keys and preshared keys are never displayed."
+msgstr "На этой странице показывается только рабочее состояние. Приватные и предварительно общие ключи никогда не отображаются."
+
+msgid "Configured, waiting for interface"
+msgstr "Настроено, ожидание интерфейса"
+
+msgid "Server traffic (RX / TX)"
+msgstr "Трафик сервера (RX / TX)"
+
+msgid "Server interface"
+msgstr "Интерфейс сервера"
+
+msgid "Not configured"
+msgstr "Не настроено"
+
+msgid "Not installed"
+msgstr "Не установлено"
+
+msgid "No data"
+msgstr "Нет данных"
+
+msgid "Running"
+msgstr "Работает"
+
+msgid "Stopped"
+msgstr "Остановлено"
+
+msgid "Enabled"
+msgstr "Включён"
+
+msgid "Disabled"
+msgstr "Отключён"
+
+msgid "Online"
+msgstr "В сети"
+
+msgid "Offline"
+msgstr "Не в сети"
+
+msgid "Never"
+msgstr "Никогда"
+
+msgid "Close"
+msgstr "Закрыть"
+
+msgid "Cancel"
+msgstr "Отмена"
+
+msgid "Disable"
+msgstr "Отключить"
+
+msgid "Enable"
+msgstr "Включить"
+
+msgid "Name"
+msgstr "Имя"
+
+msgid "State"
+msgstr "Состояние"
+
+msgid "Actions"
+msgstr "Действия"
+
+msgid "Component"
+msgstr "Компонент"
+
+msgid "Remote clients"
+msgstr "Удалённые клиенты"
+
+msgid "WAN address"
+msgstr "WAN-адрес"
+
+msgid "Remote peers"
+msgstr "Удалённые peers"
+
+msgid "online"
+msgstr "в сети"
+
+msgid "Unable to read VPN peer state."
+msgstr "Не удалось получить состояние VPN peers."
+
+msgid "The WAN address is private or CGNAT. Incoming AmneziaWG connections may not be reachable directly."
+msgstr "WAN-адрес является частным или CGNAT. Входящие подключения AmneziaWG могут быть недоступны напрямую."

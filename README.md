@@ -81,6 +81,26 @@ docker run --rm --user builder \
 вызывает `make defconfig`, загружает исходники, собирает image и выполняет
 проверку. Он прекращает работу при несовпадении pin или непригодности patch.
 
+## Virtual x86_64 / QEMU test target
+
+Virtual target отделён от production: он собирает OpenWrt `x86_64` с тем же
+VPN userspace, но не является прошивкой Flint 2 и не должен публиковаться или
+прошиваться на GL-MT6000. Он нужен для проверки LuCI, Dashboard, firewall4,
+Podkop и target-совместимого `kmod-amneziawg` без доступа к физическому
+роутеру.
+
+В Windows PowerShell:
+
+```powershell
+.\build-vm.ps1
+.\test-vm.ps1
+```
+
+Первая команда создаёт артефакты только в `artifacts/vm/`; вторая запускает
+образ в QEMU-контейнере и сохраняет serial log, HTTP-ответы, summary и JUnit в
+`artifacts/test-results/<UTC timestamp>/`. QEMU smoke-test не касается
+GL-MT6000, GitHub Actions и опубликованных release assets.
+
 ## GitHub Actions
 
 Workflow хранится в репозитории и умеет `workflow_dispatch`, push и pull
@@ -180,6 +200,27 @@ APK, `--force-depends` и ручная подмена vermagic не исполь
 
 Не создавайте фиктивный VPN interface: ключи и endpoint вводит владелец
 роутера. Podkop использует штатные firewall4/nftables/TProxy/sing-box rules.
+
+### AmneziaWG Server и VPN Dashboard
+
+Для удалённых клиентов используйте **VPN → AmneziaWG Server**, а не клиентский
+outbound tunnel `awg-out`. Страница создаёт отдельный `awg_server` netifd
+интерфейс, отдельную firewall4 zone и открывает на WAN только заданный UDP-порт.
+По умолчанию сеть сервера — `10.77.0.1/24`, изоляция peer’ов включена, DNS
+удалённых клиентов направлен на Flint 2.
+
+В поле **Traffic policy** оставьте рекомендуемое значение **Same as LAN /
+Podkop**: после поднятия интерфейса его фактический L3 device определяется
+через ubus и добавляется в `source_network_interfaces` Podkop. Поэтому трафик
+удалённого клиента проходит через тот же policy engine, что и LAN/Wi-Fi, без
+жёстко заданного имени Linux device.
+
+В **VPN → AmneziaWG Server → Remote clients** можно создать peer, получить
+однократно показанный `.conf`, скачать его или отсканировать QR-код. Секреты
+каждого клиента хранятся на роутере отдельно от UCI с правами `0600`; status
+API и Dashboard показывают только public key, handshake, RX/TX и состояние.
+Каталог secret-файлов включён в стандартный sysupgrade backup через
+`/lib/upgrade/keep.d/vpn-dashboard`.
 
 ## Diagnostics and performance testing
 

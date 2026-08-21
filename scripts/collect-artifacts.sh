@@ -81,6 +81,7 @@ manifest_version() {
   echo "AMNEZIAWG_COMMIT=$AMNEZIAWG_FEED_COMMIT"
   echo "PODKOP_VERSION=$PODKOP_VERSION"
   echo "PODKOP_COMMIT=$PODKOP_COMMIT"
+  echo "VPN_DASHBOARD_VERSION=$VPN_DASHBOARD_VERSION"
   echo "SING_BOX_VERSION=$(manifest_version sing-box)"
   echo "BUILD_DATE=$(git -C "$BUILDROOT" show -s --format=%cI HEAD)"
   echo "FIRMWARE_SHA256=$(sha256sum "$SYSUPGRADE" | awk '{print $1}')"

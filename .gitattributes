@@ -7,3 +7,6 @@ Makefile text eol=lf
 *.config text eol=lf
 *.env text eol=lf
 *.ps1 text eol=crlf
+packages/luci-app-vpn-dashboard/root/** text eol=lf
+files/** text eol=lf
+packages/** text eol=lf

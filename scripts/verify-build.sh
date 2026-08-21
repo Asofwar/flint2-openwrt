@@ -27,12 +27,14 @@ FACTORY="$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl-mt6000*factory.bin' 
 KERNEL_CONFIG="$(find "$BUILDROOT/build_dir" -path "*/linux-mediatek_filogic/linux-$OPENWRT_KERNEL/.config" -print -quit)"
 FLINT2_INFO="$(find "$BUILDROOT/build_dir" -path '*/root-mediatek/usr/bin/flint2-info' -type f -print -quit)"
 APK_REPOS="$(find "$BUILDROOT/build_dir" -path '*/root-mediatek/etc/apk/repositories.d/distfeeds.list' -type f -print -quit)"
+ROOTFS="$(find "$BUILDROOT/build_dir" -type d -path '*/root-mediatek' -print -quit)"
 test -n "$MANIFEST" || fail "GL-MT6000 manifest absent"
 test -n "$SYSUPGRADE" || fail "GL-MT6000 sysupgrade image absent"
 test -n "$FACTORY" || fail "GL-MT6000 factory image absent"
 test -n "$KERNEL_CONFIG" || fail "resolved kernel config absent"
 test -n "$FLINT2_INFO" || fail "flint2-info is absent from the root filesystem"
 test -n "$APK_REPOS" || fail "official APK repository list is absent from the root filesystem"
+test -n "$ROOTFS" || fail "target root filesystem is absent"
 test -f "$IMAGE_DIR/sha256sums" || fail "upstream SHA256 file absent"
 
 grep -qx 'CONFIG_TARGET_mediatek=y' "$CONFIG" || fail "wrong target"
@@ -51,6 +53,10 @@ config_enabled luci-app-commands
 config_enabled luci-app-statistics
 config_enabled luci-app-sqm
 config_enabled luci-app-upnp
+config_enabled ddns-scripts
+config_enabled luci-app-ddns
+config_enabled luci-app-vpn-dashboard
+config_enabled qrencode
 config_enabled uhttpd
 config_enabled uhttpd-mod-ubus
 config_enabled rpcd
@@ -123,6 +129,8 @@ has_apk 'podkop-*.apk'
 has_apk 'luci-app-podkop-*.apk'
 has_apk 'luci-i18n-podkop-ru-*.apk'
 has_apk 'sing-box-*.apk'
+has_apk 'luci-app-vpn-dashboard-*.apk'
+has_apk 'qrencode-*.apk'
 
 for package in \
   kmod-amneziawg amneziawg-tools luci-proto-amneziawg luci-i18n-amneziawg-ru \
@@ -131,9 +139,30 @@ for package in \
   kmod-mt7986-firmware mt7986-wo-firmware wpad-openssl ppp ppp-mod-pppoe luci-proto-ppp \
   luci luci-ssl-openssl luci-app-firewall luci-app-package-manager luci-app-ttyd luci-app-commands \
   luci-app-statistics luci-app-sqm luci-app-upnp uhttpd uhttpd-mod-ubus rpcd dnsmasq-full odhcpd-ipv6only \
+  ddns-scripts luci-app-ddns luci-app-vpn-dashboard qrencode \
   ip-full ip-bridge ethtool tcpdump-mini mtr-json iputils-ping iputils-tracepath bind-dig ca-bundle ca-certificates \
   curl jq coreutils-base64; do
   manifest_has "$package"
+done
+
+for required in \
+  usr/share/luci/menu.d/luci-app-vpn-dashboard.json \
+  usr/share/rpcd/acl.d/luci-app-vpn-dashboard.json \
+  www/luci-static/resources/view/vpn-dashboard/dashboard.js \
+  www/luci-static/resources/view/vpn-dashboard/amneziawg-server.js \
+  www/luci-static/resources/view/vpn-dashboard/clients.js \
+  etc/config/vpn-dashboard \
+  etc/init.d/vpn-dashboard \
+  lib/upgrade/keep.d/vpn-dashboard \
+  usr/libexec/vpn-dashboard-sync-podkop \
+  usr/libexec/vpn-dashboard-peer; do
+  test -f "$ROOTFS/$required" || fail "VPN Dashboard rootfs file is absent: $required"
+done
+test -f "$ROOTFS/usr/lib/lua/luci/i18n/vpn-dashboard.ru.lmo" || fail "VPN Dashboard Russian translation is absent"
+! grep -q 'private_key\|preshared_key' "$ROOTFS/etc/config/vpn-dashboard" || fail "VPN Dashboard default config contains a secret"
+for executable in etc/init.d/vpn-dashboard etc/hotplug.d/iface/90-vpn-dashboard usr/libexec/vpn-dashboard-sync-podkop usr/libexec/vpn-dashboard-peer; do
+  test -x "$ROOTFS/$executable" || fail "VPN Dashboard executable is not executable: $executable"
+  ! grep -q "$(printf '\r')" "$ROOTFS/$executable" || fail "VPN Dashboard executable has CRLF line endings: $executable"
 done
 
 for required in config.buildinfo feeds.buildinfo version.buildinfo packages.manifest openwrt-sha256sums BUILD_INFO.txt SBOM.spdx SHA256SUMS; do
@@ -141,7 +170,7 @@ for required in config.buildinfo feeds.buildinfo version.buildinfo packages.mani
 done
 grep -qx 'SPDXVersion: SPDX-2.3' "$OUT/SBOM.spdx" || fail "SBOM SPDX version is invalid"
 test "$(awk '$2 == "-" { count++ } END { print count + 0 }' "$OUT/packages.manifest")" -eq "$(grep -c '^PackageName: ' "$OUT/SBOM.spdx")" || fail "SBOM package count differs from image manifest"
-for field in OPENWRT_VERSION OPENWRT_COMMIT KERNEL_VERSION TARGET SUBTARGET DEVICE MT76_SOURCE MT76_COMMIT MT76_PACKAGE_VERSION MAC80211_VERSION MT7986_FIRMWARE_SOURCE MT7986_FIRMWARE_VERSION PESA_REFERENCE_BRANCH PESA_REFERENCE_COMMIT AMNEZIAWG_VERSION AMNEZIAWG_COMMIT PODKOP_VERSION PODKOP_COMMIT SING_BOX_VERSION BUILD_DATE FIRMWARE_SHA256; do
+for field in OPENWRT_VERSION OPENWRT_COMMIT KERNEL_VERSION TARGET SUBTARGET DEVICE MT76_SOURCE MT76_COMMIT MT76_PACKAGE_VERSION MAC80211_VERSION MT7986_FIRMWARE_SOURCE MT7986_FIRMWARE_VERSION PESA_REFERENCE_BRANCH PESA_REFERENCE_COMMIT AMNEZIAWG_VERSION AMNEZIAWG_COMMIT PODKOP_VERSION PODKOP_COMMIT VPN_DASHBOARD_VERSION SING_BOX_VERSION BUILD_DATE FIRMWARE_SHA256; do
   grep -q "^$field=" "$OUT/BUILD_INFO.txt" || fail "BUILD_INFO is missing field: $field"
 done
 (cd "$OUT" && sha256sum -c SHA256SUMS >/dev/null) || fail "artifact SHA256SUMS mismatch"
