@@ -8,6 +8,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     subversion swig unzip wget zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd --create-home --uid 1000 builder
+RUN usermod -l builder ubuntu && groupmod -n builder ubuntu && usermod -d /home/builder -m builder
 USER builder
 WORKDIR /workspace
