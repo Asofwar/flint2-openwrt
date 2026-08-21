@@ -41,6 +41,9 @@ src-git-full awg $AMNEZIAWG_FEED_REPOSITORY^$AMNEZIAWG_FEED_COMMIT
 src-git-full podkop $PODKOP_REPOSITORY^$PODKOP_COMMIT
 EOF
 fi
+if ! grep -Fqx "src-link flint2 $PROJECT_DIR/packages" "$BUILDROOT/feeds.conf.default"; then
+  printf 'src-link flint2 %s\n' "$PROJECT_DIR/packages" >> "$BUILDROOT/feeds.conf.default"
+fi
 
 pushd "$BUILDROOT" >/dev/null
 ./scripts/feeds update -a
@@ -64,7 +67,7 @@ else
 fi
 ./scripts/feeds install -a -p awg
 ./scripts/feeds install -a -p podkop
-./scripts/feeds install luci luci-ssl-openssl luci-app-firewall luci-app-package-manager luci-app-ttyd luci-app-commands luci-app-statistics luci-app-sqm luci-app-upnp luci-proto-wireguard luci-proto-ppp mtr-json iputils-ping iputils-tracepath
+./scripts/feeds install luci luci-ssl-openssl luci-app-firewall luci-app-package-manager luci-app-ttyd luci-app-commands luci-app-statistics luci-app-sqm luci-app-upnp luci-app-ddns luci-app-vpn-dashboard luci-proto-wireguard luci-proto-ppp mtr-json iputils-ping iputils-tracepath qrencode
 cp "$PROJECT_DIR/configs/gl-mt6000.config" .config
 make defconfig
 mkdir -p files
@@ -99,7 +102,8 @@ AMNEZIAWG_VERSION=$AMNEZIAWG_KERNEL_MODULE_VERSION
 AMNEZIAWG_COMMIT=$AMNEZIAWG_FEED_COMMIT
 PODKOP_VERSION=$PODKOP_VERSION
 PODKOP_COMMIT=$PODKOP_COMMIT
-CUSTOM_WIRELESS_REGDB=1
+CUSTOM_WIRELESS_REGDB=$CUSTOM_WIRELESS_REGDB
+VPN_DASHBOARD_VERSION=$VPN_DASHBOARD_VERSION
 EOF
 make download -j"$JOBS"
 make -j"$JOBS" V=s

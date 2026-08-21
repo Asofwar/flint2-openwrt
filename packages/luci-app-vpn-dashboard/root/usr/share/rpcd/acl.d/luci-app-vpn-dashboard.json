@@ -1,0 +1,15 @@
+{
+  "luci-app-vpn-dashboard": {
+    "description": "Manage the local AmneziaWG server and show non-secret VPN status",
+    "read": {
+      "ubus": { "network.interface": [ "dump" ], "service": [ "list" ], "file": [ "exec" ] },
+      "uci": [ "vpn-dashboard" ],
+      "file": { "/usr/libexec/vpn-dashboard-peer": [ "exec" ] }
+    },
+    "write": {
+      "uci": [ "vpn-dashboard" ],
+      "ubus": { "luci": [ "setInitAction" ], "file": [ "exec" ] },
+      "file": { "/usr/libexec/vpn-dashboard-peer": [ "exec" ] }
+    }
+  }
+}

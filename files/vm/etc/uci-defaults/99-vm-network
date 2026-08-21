@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# QEMU user networking exposes this address through the VM test runner only.
+# It is deliberately kept out of the production GL-MT6000 target.
+uci -q set network.lan.ipaddr='10.0.2.15'
+uci -q set network.lan.netmask='255.255.255.0'
+uci -q commit network
+
+exit 0

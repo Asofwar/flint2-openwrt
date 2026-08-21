@@ -1,0 +1,20 @@
+{
+  "admin/vpn/dashboard": {
+    "title": "VPN Dashboard",
+    "order": 10,
+    "action": { "type": "view", "path": "vpn-dashboard/dashboard" },
+    "depends": { "acl": [ "luci-app-vpn-dashboard" ] }
+  },
+  "admin/vpn/amneziawg-server": {
+    "title": "AmneziaWG Server",
+    "order": 20,
+    "action": { "type": "view", "path": "vpn-dashboard/amneziawg-server" },
+    "depends": { "acl": [ "luci-app-vpn-dashboard" ] }
+  },
+  "admin/vpn/amneziawg-server/clients": {
+    "title": "Remote clients",
+    "order": 30,
+    "action": { "type": "view", "path": "vpn-dashboard/clients" },
+    "depends": { "acl": [ "luci-app-vpn-dashboard" ] }
+  }
+}

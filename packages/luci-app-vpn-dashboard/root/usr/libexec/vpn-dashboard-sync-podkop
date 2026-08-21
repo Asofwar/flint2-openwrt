@@ -1,0 +1,24 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+device="$1"
+case "$device" in
+	''|*[!A-Za-z0-9_.:-]*)
+		logger -t vpn-dashboard "refusing unsafe AWG device name"
+		exit 1
+		;;
+esac
+
+config_load vpn-dashboard
+config_get policy main podkop_policy same_as_lan
+[ "$policy" = "same_as_lan" ] || exit 0
+
+sources="$(uci -q get podkop.settings.source_network_interfaces)"
+case " $sources " in
+	*" $device "*) exit 0 ;;
+esac
+
+uci -q add_list podkop.settings.source_network_interfaces="$device"
+uci -q commit podkop
+/etc/init.d/podkop reload >/dev/null 2>&1 || true

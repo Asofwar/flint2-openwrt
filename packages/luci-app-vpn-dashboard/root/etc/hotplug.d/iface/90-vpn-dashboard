@@ -1,0 +1,10 @@
+#!/bin/sh
+
+[ "$ACTION" = ifup ] || exit 0
+[ "$INTERFACE" = awg_server ] || exit 0
+[ -x /etc/init.d/vpn-dashboard ] || exit 0
+
+device="$(ubus call network.interface.awg_server status 2>/dev/null | jsonfilter -e '@.l3_device')"
+[ -n "$device" ] || exit 0
+
+/usr/libexec/vpn-dashboard-sync-podkop "$device"

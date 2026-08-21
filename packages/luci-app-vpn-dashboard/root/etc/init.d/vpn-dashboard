@@ -1,0 +1,178 @@
+#!/bin/sh /etc/rc.common
+
+[ -n "${IPKG_INSTROOT:-}" ] && exit 0
+
+START=95
+
+. /lib/functions.sh
+
+config_get_safe() {
+	config_get "$1" main "$2" "$3"
+}
+
+read_peer_secret() {
+	local id="$1" file
+	file="/etc/vpn-dashboard/peers/$id"
+	[ -f "$file" ] || return 1
+	peer_private_key="$(sed -n 's/^private_key=//p' "$file")"
+	peer_preshared_key="$(sed -n 's/^preshared_key=//p' "$file")"
+	case "$peer_private_key" in ''|*[!A-Za-z0-9+/=]* ) return 1;; esac
+	case "$peer_preshared_key" in ''|*[!A-Za-z0-9+/=]* ) return 1;; esac
+}
+
+validate_server_subnet() {
+	local address old_address candidate server_network server_count
+	local NETWORK COUNT candidate_network candidate_count
+
+	address="$1"
+	old_address="$2"
+	eval "$(ipcalc.sh -d "$address")" || return 1
+	server_network="$NETWORK"
+	server_count="$COUNT"
+	for candidate in $(ip -o -4 addr show | awk '{print $4}'); do
+		[ "$candidate" = "$address" ] && continue
+		[ "$candidate" = "$old_address" ] && continue
+		eval "$(ipcalc.sh -d "$candidate")" || continue
+		candidate_network="$NETWORK"
+		candidate_count="$COUNT"
+		if [ "$server_network" -lt $((candidate_network + candidate_count)) ] && [ "$candidate_network" -lt $((server_network + server_count)) ]; then
+			logger -t vpn-dashboard "AWG server subnet $address overlaps $candidate"
+			return 1
+		fi
+	done
+}
+
+sync_peer() {
+	local section="$1" interface public_key address enabled id peer_section
+
+	config_get interface main interface awg_server
+	config_get public_key "$section" public_key
+	config_get address "$section" address
+	config_get enabled "$section" enabled 1
+	case "$section" in *[!A-Za-z0-9_]*|'') return 1;; esac
+	id="${section#peer_}"
+	read_peer_secret "$id" || return 1
+	case "$public_key" in ''|*[!A-Za-z0-9+/=_-]* ) return 1;; esac
+	case "$address" in *[!0-9./]*|'') return 1;; esac
+	peer_section="vpn_dashboard_${section}"
+	uci -q set network."$peer_section"="amneziawg_${interface}"
+	uci -q set network."$peer_section".public_key="$public_key"
+	uci -q set network."$peer_section".allowed_ips="${address%/*}/32"
+	uci -q set network."$peer_section".preshared_key="$peer_preshared_key"
+	uci -q set network."$peer_section".route_allowed_ips='0'
+	uci -q set network."$peer_section".disabled="$([ "$enabled" = '1' ] && echo 0 || echo 1)"
+	uci -q set network."$peer_section"._vpn_dashboard='1'
+}
+
+sync_peers() {
+	local interface section
+	config_get interface main interface awg_server
+	for section in $(uci -q show network | sed -n "s/^network\\.\\(vpn_dashboard_[A-Za-z0-9_]*\\)='amneziawg_${interface}'$/\\1/p"); do
+		uci -q delete network."$section"
+	done
+	config_foreach sync_peer peer
+}
+
+configure_server() {
+	local enabled interface address old_address listen_port mtu allow_internet allow_lan
+	local client_isolation policy private_key key value
+	config_load vpn-dashboard
+	config_get_safe enabled enabled 0
+	[ "$enabled" = "1" ] || return 0
+	config_get_safe interface interface awg_server
+	config_get_safe address address 10.77.0.1/24
+	config_get_safe listen_port listen_port 51820
+	config_get_safe mtu mtu 1420
+	config_get_safe allow_internet allow_internet 1
+	config_get_safe allow_lan allow_lan 1
+	config_get_safe client_isolation client_isolation 1
+	config_get_safe policy podkop_policy same_as_lan
+
+	case "$interface" in ''|*[!A-Za-z0-9_]* ) logger -t vpn-dashboard "invalid interface name"; return 1;; esac
+	case "$listen_port" in *[!0-9]*|'') logger -t vpn-dashboard "invalid listen port"; return 1;; esac
+	[ "$listen_port" -ge 1 ] 2>/dev/null && [ "$listen_port" -le 65535 ] 2>/dev/null || return 1
+	case "$mtu" in *[!0-9]*|'') logger -t vpn-dashboard "invalid MTU"; return 1;; esac
+	[ "$mtu" -ge 576 ] 2>/dev/null && [ "$mtu" -le 8940 ] 2>/dev/null || return 1
+	old_address="$(uci -q get network.$interface.addresses)"
+	validate_server_subnet "$address" "$old_address" || return 1
+
+	private_key="$(uci -q get network.$interface.private_key)"
+	if [ -z "$private_key" ]; then
+		private_key="$(awg genkey)" || return 1
+		umask 077
+	fi
+	uci -q set network.$interface='interface'
+	uci -q set network.$interface.proto='amneziawg'
+	uci -q set network.$interface.private_key="$private_key"
+	uci -q set network.$interface.addresses="$address"
+	uci -q set network.$interface.listen_port="$listen_port"
+	uci -q set network.$interface.mtu="$mtu"
+	for key in awg_jc awg_jmin awg_jmax awg_s1 awg_s2 awg_s3 awg_s4 awg_h1 awg_h2 awg_h3 awg_h4 awg_i1 awg_i2 awg_i3 awg_i4 awg_i5; do
+		config_get_safe value "$key" ''
+		[ -n "$value" ] && uci -q set network.$interface.$key="$value"
+	done
+	sync_peers
+	uci -q set firewall.awg_server='zone'
+	uci -q set firewall.awg_server.name='awg_server'
+	uci -q set firewall.awg_server.network="$interface"
+	uci -q set firewall.awg_server.input='REJECT'
+	uci -q set firewall.awg_server.output='ACCEPT'
+	uci -q set firewall.awg_server.forward='REJECT'
+	uci -q set firewall.awg_server.mtu_fix='1'
+	uci -q set firewall.awg_server_dns='rule'
+	uci -q set firewall.awg_server_dns.name='Allow-AWG-DNS'
+	uci -q set firewall.awg_server_dns.src='awg_server'
+	uci -q set firewall.awg_server_dns.proto='tcp udp'
+	uci -q set firewall.awg_server_dns.dest_port='53'
+	uci -q set firewall.awg_server_dns.target='ACCEPT'
+	uci -q set firewall.awg_server_input='rule'
+	uci -q set firewall.awg_server_input.name='Allow-AmneziaWG-Server'
+	uci -q set firewall.awg_server_input.src='wan'
+	uci -q set firewall.awg_server_input.proto='udp'
+	uci -q set firewall.awg_server_input.dest_port="$listen_port"
+	uci -q set firewall.awg_server_input.target='ACCEPT'
+	if [ "$allow_internet" = "1" ]; then
+		uci -q set firewall.awg_server_wan='forwarding'
+		uci -q set firewall.awg_server_wan.src='awg_server'
+		uci -q set firewall.awg_server_wan.dest='wan'
+	else
+		uci -q delete firewall.awg_server_wan
+	fi
+	if [ "$allow_lan" = "1" ]; then
+		uci -q set firewall.awg_server_lan='forwarding'
+		uci -q set firewall.awg_server_lan.src='awg_server'
+		uci -q set firewall.awg_server_lan.dest='lan'
+	else
+		uci -q delete firewall.awg_server_lan
+	fi
+	if [ "$client_isolation" = "0" ]; then
+		uci -q set firewall.awg_server_peers='rule'
+		uci -q set firewall.awg_server_peers.name='Allow-AWG-peer-traffic'
+		uci -q set firewall.awg_server_peers.src='awg_server'
+		uci -q set firewall.awg_server_peers.dest='awg_server'
+		uci -q set firewall.awg_server_peers.target='ACCEPT'
+	else
+		uci -q delete firewall.awg_server_peers
+	fi
+	uci -q commit network
+	chmod 0600 /etc/config/network /etc/config/vpn-dashboard
+	uci -q commit firewall
+	/etc/init.d/network reload
+	/etc/init.d/firewall reload
+	logger -t vpn-dashboard "AmneziaWG server $interface configured: policy=$policy isolation=$client_isolation"
+}
+
+start() {
+	configure_server
+}
+
+reload() {
+	start
+}
+
+stop() {
+	local interface
+	config_load vpn-dashboard
+	config_get_safe interface interface awg_server
+	ifdown "$interface" >/dev/null 2>&1 || true
+}
