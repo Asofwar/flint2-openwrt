@@ -106,7 +106,22 @@ uci commit vpn-dashboard
 sleep 8
 ifstatus awg_server | grep -q "\"up\": true" && echo AWG_SERVER_PASS
 device="$(ubus call network.interface.awg_server status | jsonfilter -e "@.l3_device")"
-test -n "$device" && /usr/libexec/vpn-dashboard-sync-podkop "$device" && uci -q get podkop.settings.source_network_interfaces | grep -qw "$device" && echo PODKOP_SOURCE_PASS
+test -n "$device"
+/usr/libexec/vpn-dashboard-sync-podkop "$device"
+uci -q get podkop.settings.source_network_interfaces | grep -qw "$device"
+uci set podkop.main.connection_type=vpn
+uci set podkop.main.interface="$device"
+uci -q delete podkop.main.community_lists
+uci set podkop.settings.dont_touch_dhcp=1
+uci set podkop.settings.exclude_ntp=1
+uci commit podkop
+/usr/bin/podkop start
+nft list set inet PodkopTable interfaces >/tmp/podkop-interfaces.nft
+grep -qw br-lan /tmp/podkop-interfaces.nft
+grep -qw "$device" /tmp/podkop-interfaces.nft
+/usr/bin/podkop stop
+rm -f /tmp/podkop-interfaces.nft
+echo PODKOP_NFT_SOURCE_PASS
 /usr/libexec/vpn-dashboard-peer create vmpeer full >/tmp/vmpeer.conf
 cp /tmp/vmpeer.conf /www/vmpeer.conf
 chmod 0644 /www/vmpeer.conf
@@ -225,7 +240,7 @@ wait "$CONSOLE_PID" || true
 wait "$REMOTE_CONSOLE_PID" || true
 tr -d '\r' < "$RESULT_DIR/openwrt.serial.log" > "$RESULT_DIR/openwrt.serial.normalized.log"
 tr -d '\r' < "$RESULT_DIR/remote.serial.log" > "$RESULT_DIR/remote.serial.normalized.log"
-for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_SOURCE_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE PEER_TOGGLE_PASS PEER_DELETE_PASS GUEST_TEST_COMPLETE; do
+for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_NFT_SOURCE_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE PEER_TOGGLE_PASS PEER_DELETE_PASS GUEST_TEST_COMPLETE; do
 	grep -Fxq "$marker" "$RESULT_DIR/openwrt.serial.normalized.log" || fail "guest runtime test failed: $marker"
 done
 for marker in REMOTE_AWG_CONFIG_PASS REMOTE_AWG_HANDSHAKE_PASS REMOTE_DNS_PASS; do
@@ -241,7 +256,7 @@ record AWG_MODULE PASS
 record AWG_SERVER PASS
 record REMOTE_AWG_HANDSHAKE PASS
 record REMOTE_DNS PASS
-record PODKOP_SOURCE_INTERFACE PASS
+record PODKOP_NFT_SOURCE_INTERFACE PASS
 record PEER_MANAGEMENT PASS
 record QR_GENERATION PASS
 record SECRET_LEAK_TEST PASS
@@ -256,7 +271,7 @@ cat > "$RESULT_DIR/junit.xml" <<EOF
   <testcase name="amneziawg_server"/>
   <testcase name="remote_awg_handshake"/>
   <testcase name="remote_dns_via_router"/>
-  <testcase name="podkop_source_interface"/>
+  <testcase name="podkop_nft_source_interface"/>
   <testcase name="peer_management_and_qr"/>
   <testcase name="dashboard_public_assets_no_secret_names"/>
   <testcase name="dashboard_status_api_no_secret_names"/>
