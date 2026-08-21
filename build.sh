@@ -105,6 +105,6 @@ make download -j"$JOBS"
 make -j"$JOBS" V=s
 popd >/dev/null
 
-BUILDROOT="$BUILDROOT" "$PROJECT_DIR/scripts/verify-custom-regdb.sh"
+BUILDROOT="$BUILDROOT" bash "$PROJECT_DIR/scripts/verify-custom-regdb.sh"
 BUILDROOT="$BUILDROOT" "$PROJECT_DIR/scripts/collect-artifacts.sh"
 BUILDROOT="$BUILDROOT" "$PROJECT_DIR/scripts/verify-build.sh"
