@@ -201,5 +201,14 @@ for marker in EXTERNAL_AWG_READY EXTERNAL_AWG_TRANSFER_PASS; do grep -Fxq "$mark
 record AWG_OUTBOUND PASS
 record EXTERNAL_AWG_TRANSFER PASS
 record CONTROLLED_AWG_ENDPOINT PASS
+cat > "$RESULT_DIR/junit.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="openwrt-vm-awg-out" tests="4" failures="0">
+  <testcase name="outbound_link"/>
+  <testcase name="awg_outbound_handshake"/>
+  <testcase name="external_awg_transfer"/>
+  <testcase name="controlled_awg_endpoint"/>
+</testsuite>
+EOF
 printf 'VIRTUAL_AWG_OUT_VALIDATION=PASS\n' >> "$RESULT_DIR/summary.txt"
 echo "VM AWG-OUT TEST PASS: $RESULT_DIR"
