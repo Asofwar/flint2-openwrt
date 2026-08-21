@@ -15,6 +15,8 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
+      - name: Разрешить запись пользователю сборки
+        run: sudo chown -R 1000:1000 "$GITHUB_WORKSPACE"
       - name: Build builder image
         run: docker build --tag flint2-openwrt-builder:25.12.5 .
       - name: Build firmware

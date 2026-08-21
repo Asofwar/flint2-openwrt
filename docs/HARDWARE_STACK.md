@@ -17,7 +17,7 @@
 | 2.4 GHz 256-QAM / iBF / EDCCA GUI | pesa1234 trees | vendor/experimental | no | no validated 6.12-compatible implementation or regulatory-safe control plane | medium/high |
 | AmneziaWG kernel module | awg-openwrt `98b9eaf2…` | external package source | yes | compiled by this buildroot against its exact kernel ABI | medium |
 | Podkop 0.7.22 | itdoginfo/podkop `c0a2736b…` + local compatibility patch | external package source | yes | its dependencies/conflicts are upstream; one obsolete LuCI registration is removed for 25.12 | medium |
-| full sing-box 1.12.17 | OpenWrt packages feed + local compatibility patch | upstream package | yes | preserves full protocol feature set required by Podkop | medium |
+| full sing-box 1.12.17 | OpenWrt packages feed + local compatibility patch | upstream package | yes | keeps the full upstream variant required by Podkop | medium |
 
 ## Решения по pesa1234
 
@@ -52,8 +52,8 @@ Podkop вызывает его повторно. Это создаёт дубл�
 хотя полный `sing-box` конфликтует с tiny-вариантом. Для пакета Podkop,
 выбирающего полный вариант, это превращается в Kconfig-цикл. Патч убирает
 только виртуальное предоставление у невыбранного tiny-варианта. В образ
-собирается полный `sing-box` 1.12.17 со всеми его включёнными upstream
-опциями; tiny-вариант не включается.
+собирается полный `sing-box` 1.12.17 с его стандартным upstream набором
+возможностей; tiny-вариант не включается.
 
 ## Ограничения проверки
 
