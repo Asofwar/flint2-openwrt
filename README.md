@@ -106,8 +106,15 @@ request, однако в GitHub он сейчас вручную отключё�
 В `/etc/apk/repositories.d/distfeeds.list` встроены официальные HTTPS-репозитории
 закреплённого OpenWrt release для `mediatek/filogic` и `aarch64_cortex-a53`:
 target/kmod, `base`, `luci`, `packages`, `routing`, `telephony` и `video`.
-AWG и Podkop уже включены в образ из единой сборки; отдельные неофициальные
-APK-репозитории для них намеренно не добавляются.
+Дополнительно включены три удалённых HTTPS feed’а этого проекта для
+`kmod-amneziawg`, AWG и Podkop. Они публикуются как assets GitHub Release и
+подписываются P-256 ключом; в образе хранится только публичный ключ
+`/etc/apk/keys/flint2-custom-repository.pem`.
+
+Не выполняйте массовый `apk upgrade`: обновляйте только конкретный совместимый
+пакет либо переходите на новый целостный sysupgrade. Для выпуска обновлённого
+custom feed из Windows PowerShell используйте `./scripts/publish-apk-repository.ps1`
+после успешной локальной сборки.
 
 Проверка перед прошивкой:
 

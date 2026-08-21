@@ -67,6 +67,9 @@ https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}/packages/aarch64_cor
 https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}/packages/aarch64_cortex-a53/routing/packages.adb
 https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}/packages/aarch64_cortex-a53/telephony/packages.adb
 https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}/packages/aarch64_cortex-a53/video/packages.adb
+$FLINT2_APK_REPOSITORY_BASE_URL/flint2-target-packages.adb
+$FLINT2_APK_REPOSITORY_BASE_URL/flint2-awg-packages.adb
+$FLINT2_APK_REPOSITORY_BASE_URL/flint2-podkop-packages.adb
 EOF
 cat > files/etc/flint2-build-info <<EOF
 OPENWRT_VERSION=$OPENWRT_VERSION

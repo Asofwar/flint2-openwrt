@@ -106,7 +106,14 @@ for repository in \
   "$official_apk_base/packages/aarch64_cortex-a53/video/packages.adb"; do
   grep -Fqx "$repository" "$APK_REPOS" || fail "official APK repository is missing: $repository"
 done
-test "$(grep -vc '^[[:space:]]*\(#\|$\)' "$APK_REPOS")" -eq 7 || fail "APK repository list contains non-official entries"
+for repository in \
+  "$FLINT2_APK_REPOSITORY_BASE_URL/flint2-target-packages.adb" \
+  "$FLINT2_APK_REPOSITORY_BASE_URL/flint2-awg-packages.adb" \
+  "$FLINT2_APK_REPOSITORY_BASE_URL/flint2-podkop-packages.adb"; do
+  grep -Fqx "$repository" "$APK_REPOS" || fail "custom remote APK repository is missing: $repository"
+done
+test -f "$(dirname "$APK_REPOS")/../keys/flint2-custom-repository.pem" || fail "custom APK repository public key is absent"
+test "$(grep -vc '^[[:space:]]*\(#\|$\)' "$APK_REPOS")" -eq 10 || fail "APK repository list is incomplete or contains unexpected entries"
 
 has_apk "kmod-amneziawg-${OPENWRT_KERNEL}*.apk"
 has_apk 'amneziawg-tools-*.apk'
