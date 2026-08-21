@@ -55,6 +55,8 @@ cp -f "$MANIFEST" "$OUT/packages.manifest"
   echo "podkop_commit=$PODKOP_COMMIT"
 } > "$OUT/version.buildinfo"
 
+BUILDROOT="$BUILDROOT" OUT="$OUT" bash "$PROJECT_DIR/scripts/generate-sbom.sh"
+
 manifest_version() {
   awk -v package="$1" '$1 == package && $2 == "-" { print $3; exit }' "$OUT/packages.manifest"
 }

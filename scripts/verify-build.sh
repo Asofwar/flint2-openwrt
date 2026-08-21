@@ -114,9 +114,11 @@ for package in \
   manifest_has "$package"
 done
 
-for required in config.buildinfo feeds.buildinfo version.buildinfo packages.manifest openwrt-sha256sums BUILD_INFO.txt SHA256SUMS; do
+for required in config.buildinfo feeds.buildinfo version.buildinfo packages.manifest openwrt-sha256sums BUILD_INFO.txt SBOM.spdx SHA256SUMS; do
   test -f "$OUT/$required" || fail "missing collected artifact: $required"
 done
+grep -qx 'SPDXVersion: SPDX-2.3' "$OUT/SBOM.spdx" || fail "SBOM SPDX version is invalid"
+test "$(awk '$2 == "-" { count++ } END { print count + 0 }' "$OUT/packages.manifest")" -eq "$(grep -c '^PackageName: ' "$OUT/SBOM.spdx")" || fail "SBOM package count differs from image manifest"
 for field in OPENWRT_VERSION OPENWRT_COMMIT KERNEL_VERSION TARGET SUBTARGET DEVICE MT76_SOURCE MT76_COMMIT MT76_PACKAGE_VERSION MAC80211_VERSION MT7986_FIRMWARE_SOURCE MT7986_FIRMWARE_VERSION PESA_REFERENCE_BRANCH PESA_REFERENCE_COMMIT AMNEZIAWG_VERSION AMNEZIAWG_COMMIT PODKOP_VERSION PODKOP_COMMIT SING_BOX_VERSION BUILD_DATE FIRMWARE_SHA256; do
   grep -q "^$field=" "$OUT/BUILD_INFO.txt" || fail "BUILD_INFO is missing field: $field"
 done

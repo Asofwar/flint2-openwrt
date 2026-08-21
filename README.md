@@ -96,6 +96,7 @@ request, однако в GitHub он сейчас вручную отключё�
 * `*-factory.bin` — первоначальная установка через совместимый U-Boot recovery;
 * `packages.manifest` и `openwrt-sha256sums` из upstream;
 * `config.buildinfo`, `feeds.buildinfo`, `version.buildinfo`, `BUILD_INFO.txt`;
+* `SBOM.spdx` в формате SPDX 2.3 для всех пакетов образа;
 * `SHA256SUMS` для всех собранных артефактов.
 
 `BUILD_INFO.txt` содержит неизменяемые commit OpenWrt, AWG, Podkop и pesa, а
