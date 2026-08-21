@@ -12,6 +12,11 @@ $ProjectPath = (Resolve-Path $PSScriptRoot).Path
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & docker volume create $VolumeName | Out-Null
+& docker run --rm --user root `
+    "--mount=type=volume,src=$VolumeName,dst=/build" `
+    flint2-openwrt-builder:25.12.5 sh -c 'mkdir -p /build && chown -R builder:builder /build'
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 & docker run --rm --user builder `
     "--mount=type=bind,src=$ProjectPath,dst=/workspace" `
     "--mount=type=volume,src=$VolumeName,dst=/build" `
@@ -19,4 +24,3 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     --env "JOBS=$Jobs" `
     flint2-openwrt-builder:25.12.5 ./build.sh
 exit $LASTEXITCODE
-
