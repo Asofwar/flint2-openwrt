@@ -19,8 +19,32 @@ test -s "$REGDB" || fail "regulatory.db is absent from the root filesystem"
 test -n "$MANIFEST" || fail "firmware manifest was not found"
 
 extract_country() {
-  awk -v header="country $1:" '$0 == header { inside = 1 } inside { if ($0 ~ /^country [A-Z0-9][A-Z0-9]:/ && $0 != header) exit; print }' "$2"
+  awk -v country="$1" '
+    $0 ~ ("^country " country ":") { inside = 1 }
+    inside {
+      if ($0 ~ /^country [A-Z0-9][A-Z0-9]:/ && $0 !~ ("^country " country ":")) exit
+      print
+    }
+  ' "$2"
 }
+
+country_codes() {
+  awk '/^country [A-Z0-9][A-Z0-9]:/ { print substr($2, 1, 2) }' "$1"
+}
+
+stock_countries="$(country_codes "$STOCK_DB_TXT")"
+if grep -Fxq 'BJ' <<< "$stock_countries"; then
+  expected_countries="$stock_countries"
+else
+  expected_countries="${stock_countries}"$'\nBJ'
+fi
+custom_countries="$(country_codes "$DB_TXT")"
+diff -u <(printf '%s\n' "$expected_countries") <(printf '%s\n' "$custom_countries") >/dev/null || fail "country list was modified unexpectedly"
+
+while IFS= read -r country; do
+  test -n "$country" || continue
+  diff -u <(extract_country "$country" "$STOCK_DB_TXT") <(extract_country "$country" "$DB_TXT") >/dev/null || fail "country $country was modified"
+done <<< "$stock_countries"
 
 grep -qx 'country BJ:' "$DB_TXT" || fail "country BJ is absent"
 stock_world="$(extract_country 00 "$STOCK_DB_TXT")"

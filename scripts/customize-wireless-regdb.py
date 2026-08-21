@@ -40,8 +40,6 @@ def transform(lines: list[str]) -> tuple[list[str], bool]:
     out = list(lines)
     if out and not out[-1].endswith("\n"):
         out[-1] = f"{out[-1]}\n"
-    if out and out[-1].strip():
-        out.append("\n")
     out.append("country BJ:\n")
     out.extend(f"{rule}\n" for rule in TEMPLATE_LINES)
     return out, True
@@ -58,7 +56,9 @@ def main() -> int:
     transformed, added = transform(original)
 
     rendered = "".join(transformed)
-    if "country BJ:\n" not in rendered or "    (5150 - 5350 @ 160), (36)\n" not in rendered or "    (5925 - 7125 @ 320), (36)\n" not in rendered:
+    if "country BJ:\n" not in rendered or (
+        added and any(f"{rule}\n" not in rendered for rule in TEMPLATE_LINES)
+    ):
         print("wireless-regdb customization failed: BJ template validation failed", file=sys.stderr)
         return 1
 
