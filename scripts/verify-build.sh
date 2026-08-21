@@ -25,10 +25,12 @@ MANIFEST="$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl-mt6000*.manifest' -
 SYSUPGRADE="$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl-mt6000*sysupgrade.bin' -print -quit)"
 FACTORY="$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl-mt6000*factory.bin' -print -quit)"
 KERNEL_CONFIG="$(find "$BUILDROOT/build_dir" -path "*/linux-mediatek_filogic/linux-$OPENWRT_KERNEL/.config" -print -quit)"
+FLINT2_INFO="$(find "$BUILDROOT/build_dir" -path '*/root-mediatek/usr/bin/flint2-info' -type f -print -quit)"
 test -n "$MANIFEST" || fail "GL-MT6000 manifest absent"
 test -n "$SYSUPGRADE" || fail "GL-MT6000 sysupgrade image absent"
 test -n "$FACTORY" || fail "GL-MT6000 factory image absent"
 test -n "$KERNEL_CONFIG" || fail "resolved kernel config absent"
+test -n "$FLINT2_INFO" || fail "flint2-info is absent from the root filesystem"
 test -f "$IMAGE_DIR/sha256sums" || fail "upstream SHA256 file absent"
 
 grep -qx 'CONFIG_TARGET_mediatek=y' "$CONFIG" || fail "wrong target"
@@ -114,6 +116,9 @@ done
 
 for required in config.buildinfo feeds.buildinfo version.buildinfo packages.manifest openwrt-sha256sums BUILD_INFO.txt SHA256SUMS; do
   test -f "$OUT/$required" || fail "missing collected artifact: $required"
+done
+for field in OPENWRT_VERSION OPENWRT_COMMIT KERNEL_VERSION TARGET SUBTARGET DEVICE MT76_SOURCE MT76_COMMIT MT76_PACKAGE_VERSION MAC80211_VERSION MT7986_FIRMWARE_SOURCE MT7986_FIRMWARE_VERSION PESA_REFERENCE_BRANCH PESA_REFERENCE_COMMIT AMNEZIAWG_VERSION AMNEZIAWG_COMMIT PODKOP_VERSION PODKOP_COMMIT SING_BOX_VERSION BUILD_DATE FIRMWARE_SHA256; do
+  grep -q "^$field=" "$OUT/BUILD_INFO.txt" || fail "BUILD_INFO is missing field: $field"
 done
 (cd "$OUT" && sha256sum -c SHA256SUMS >/dev/null) || fail "artifact SHA256SUMS mismatch"
 

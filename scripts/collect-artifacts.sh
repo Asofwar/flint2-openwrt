@@ -25,12 +25,14 @@ copy_one() {
 copy_one '*gl-mt6000*factory.bin'
 copy_one '*gl-mt6000*sysupgrade.bin'
 copy_one '*gl-mt6000*.manifest'
+SYSUPGRADE="$(find "$OUT" -maxdepth 1 -type f -name '*gl-mt6000*sysupgrade.bin' -print -quit)"
+MANIFEST="$OUT/$(basename "$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl-mt6000*.manifest' -print -quit)")"
 test -f "$IMAGE_DIR/sha256sums" || fail "missing upstream sha256sums"
 # Windows filesystems are case-insensitive: keep the upstream file distinct
 # from the aggregate SHA256SUMS generated below.
 cp -f "$IMAGE_DIR/sha256sums" "$OUT/openwrt-sha256sums"
 cp -f "$BUILDROOT/.config" "$OUT/config.buildinfo"
-cp -f "$IMAGE_DIR/$(basename "$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl-mt6000*.manifest' -print -quit)")" "$OUT/packages.manifest"
+cp -f "$MANIFEST" "$OUT/packages.manifest"
 
 {
   echo "openwrt=$OPENWRT_COMMIT"
@@ -53,14 +55,33 @@ cp -f "$IMAGE_DIR/$(basename "$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl
   echo "podkop_commit=$PODKOP_COMMIT"
 } > "$OUT/version.buildinfo"
 
+manifest_version() {
+  awk -v package="$1" '$1 == package && $2 == "-" { print $3; exit }' "$OUT/packages.manifest"
+}
+
 {
-  echo "Flint 2 custom OpenWrt build"
-  echo "device=glinet_gl-mt6000"
-  echo "target=mediatek/filogic"
-  echo "architecture=aarch64_cortex-a53"
-  echo "openwrt_commit=$OPENWRT_COMMIT"
-  echo "kernel=$OPENWRT_KERNEL"
-  echo "files=$(find "$OUT" -maxdepth 1 -type f -printf '%f ' | LC_ALL=C sort | tr '\n' ' ')"
+  echo "OPENWRT_VERSION=$OPENWRT_VERSION"
+  echo "OPENWRT_COMMIT=$OPENWRT_COMMIT"
+  echo "KERNEL_VERSION=$OPENWRT_KERNEL"
+  echo "TARGET=mediatek"
+  echo "SUBTARGET=filogic"
+  echo "ARCHITECTURE=aarch64_cortex-a53"
+  echo "DEVICE=glinet_gl-mt6000"
+  echo "MT76_SOURCE=$OPENWRT_REPOSITORY"
+  echo "MT76_COMMIT=$OPENWRT_COMMIT"
+  echo "MT76_PACKAGE_VERSION=$(manifest_version kmod-mt7915e)"
+  echo "MAC80211_VERSION=$(manifest_version kmod-mac80211)"
+  echo "MT7986_FIRMWARE_SOURCE=$OPENWRT_REPOSITORY"
+  echo "MT7986_FIRMWARE_VERSION=$(manifest_version mt7986-wo-firmware)"
+  echo "PESA_REFERENCE_BRANCH=$PESA_OPENWRT_BRANCH"
+  echo "PESA_REFERENCE_COMMIT=$PESA_OPENWRT_COMMIT"
+  echo "AMNEZIAWG_VERSION=$AMNEZIAWG_KERNEL_MODULE_VERSION"
+  echo "AMNEZIAWG_COMMIT=$AMNEZIAWG_FEED_COMMIT"
+  echo "PODKOP_VERSION=$PODKOP_VERSION"
+  echo "PODKOP_COMMIT=$PODKOP_COMMIT"
+  echo "SING_BOX_VERSION=$(manifest_version sing-box)"
+  echo "BUILD_DATE=$(git -C "$BUILDROOT" show -s --format=%cI HEAD)"
+  echo "FIRMWARE_SHA256=$(sha256sum "$SYSUPGRADE" | awk '{print $1}')"
 } > "$OUT/BUILD_INFO.txt"
 
 (

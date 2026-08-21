@@ -25,9 +25,11 @@ require_command podkop
 require_command iw
 require_command iwinfo
 require_command wifi
+require_command flint2-info
 
 ubus call system board
 uname -a
+flint2-info
 for package in luci luci-ssl-openssl luci-app-package-manager firewall4 nftables-json kmod-wireguard wireguard-tools luci-proto-wireguard kmod-amneziawg amneziawg-tools luci-proto-amneziawg luci-i18n-amneziawg-ru podkop luci-app-podkop luci-i18n-podkop-ru sing-box kmod-nft-tproxy ppp ppp-mod-pppoe luci-proto-ppp wpad-openssl kmod-mt7915e kmod-mt7986-firmware mt7986-wo-firmware; do
   apk info -e "$package" >/dev/null 2>&1 || {
     echo "RUNTIME TEST FAILED: APK is missing: $package" >&2

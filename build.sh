@@ -55,6 +55,26 @@ fi
 ./scripts/feeds install luci luci-ssl-openssl luci-app-firewall luci-app-package-manager luci-app-ttyd luci-app-commands luci-app-statistics luci-app-sqm luci-app-upnp luci-proto-wireguard luci-proto-ppp mtr-json iputils-ping iputils-tracepath
 cp "$PROJECT_DIR/configs/gl-mt6000.config" .config
 make defconfig
+mkdir -p files
+cp -a "$PROJECT_DIR/files/." files/
+install -D -m 0755 "$PROJECT_DIR/scripts/flint2-info.sh" files/usr/bin/flint2-info
+cat > files/etc/flint2-build-info <<EOF
+OPENWRT_VERSION=$OPENWRT_VERSION
+OPENWRT_COMMIT=$OPENWRT_COMMIT
+KERNEL_VERSION=$OPENWRT_KERNEL
+TARGET=mediatek
+SUBTARGET=filogic
+DEVICE=glinet_gl-mt6000
+MT76_SOURCE=$OPENWRT_REPOSITORY
+MT76_COMMIT=$OPENWRT_COMMIT
+MT7986_FIRMWARE_SOURCE=$OPENWRT_REPOSITORY
+PESA_REFERENCE_BRANCH=$PESA_OPENWRT_BRANCH
+PESA_REFERENCE_COMMIT=$PESA_OPENWRT_COMMIT
+AMNEZIAWG_VERSION=$AMNEZIAWG_KERNEL_MODULE_VERSION
+AMNEZIAWG_COMMIT=$AMNEZIAWG_FEED_COMMIT
+PODKOP_VERSION=$PODKOP_VERSION
+PODKOP_COMMIT=$PODKOP_COMMIT
+EOF
 make download -j"$JOBS"
 make -j"$JOBS" V=s
 popd >/dev/null

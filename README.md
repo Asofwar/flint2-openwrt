@@ -83,10 +83,10 @@ docker run --rm --user builder \
 
 ## GitHub Actions
 
-Workflow поддерживает `workflow_dispatch`, push и pull request, собирает образ
-в Docker и публикует каталог `artifacts/` через Actions artifact. GitHub CI
-можно запускать вручную после изменения pins; локальная сборка остаётся
-основной проверкой до фактической прошивки.
+Workflow хранится в репозитории и умеет `workflow_dispatch`, push и pull
+request, однако в GitHub он сейчас вручную отключён по решению владельца
+репозитория. Локальная сборка остаётся основной проверкой до фактической
+прошивки.
 
 ## Firmware artifacts
 
@@ -97,6 +97,10 @@ Workflow поддерживает `workflow_dispatch`, push и pull request, с�
 * `packages.manifest` и `openwrt-sha256sums` из upstream;
 * `config.buildinfo`, `feeds.buildinfo`, `version.buildinfo`, `BUILD_INFO.txt`;
 * `SHA256SUMS` для всех собранных артефактов.
+
+`BUILD_INFO.txt` содержит неизменяемые commit OpenWrt, AWG, Podkop и pesa, а
+также фактические версии mt76/mac80211, MT7986 firmware и sing-box из манифеста
+собранного образа.
 
 Проверка перед прошивкой:
 
@@ -174,6 +178,18 @@ APK, `--force-depends` и ручная подмена vermagic не исполь
 Скрипт проверяет package presence, `modprobe amneziawg`, временный интерфейс
 AWG, LuCI menu/переводы, Podkop, sing-box, nftables, firewall4, Wi-Fi и
 interrupt diagnostics. Он не изменяет VPN-конфигурацию.
+
+На самом роутере доступна команда:
+
+```sh
+flint2-info
+```
+
+Она выводит версию OpenWrt и kernel, фактические версии mt76, Wi-Fi firmware,
+mac80211, wpad, AmneziaWG, Podkop и sing-box, а также наблюдаемые состояния
+WED/PPE и UCI-настроек software/hardware flow offload. Отсутствие загруженного
+модуля не является доказательством выключенной встроенной функции, поэтому
+состояние WED/PPE всё равно подтверждайте на реальном устройстве.
 
 Для производительности измеряйте отдельно `iperf3` LAN→LAN, Wi-Fi→LAN и 2.5GbE
 в одном режиме за раз. Для проверки WED/offload, DFS, EEE/autonegotiation и
