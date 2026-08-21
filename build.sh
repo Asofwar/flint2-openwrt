@@ -5,6 +5,13 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$PROJECT_DIR/scripts/versions.env"
 BUILDROOT="${BUILDROOT:-$PROJECT_DIR/.work/openwrt}"
 JOBS="${JOBS:-$(nproc)}"
+CUSTOM_WIRELESS_REGDB="${CUSTOM_WIRELESS_REGDB:-0}"
+
+case "$CUSTOM_WIRELESS_REGDB" in
+  0|1) ;;
+  *) echo "CUSTOM_WIRELESS_REGDB must be 0 or 1" >&2; exit 2;;
+esac
+export CUSTOM_WIRELESS_REGDB
 
 require() { command -v "$1" >/dev/null || { echo "missing required command: $1" >&2; exit 1; }; }
 require git
@@ -25,14 +32,18 @@ fi
 
 REGDB_PACKAGE_DIR="$BUILDROOT/package/firmware/wireless-regdb"
 REGDB_PATCH="$PROJECT_DIR/patches/openwrt/0001-wireless-regdb-run-customizer.patch"
-install -D -m 0755 "$PROJECT_DIR/scripts/customize-wireless-regdb.py" "$REGDB_PACKAGE_DIR/customize-wireless-regdb.py"
-if git -C "$BUILDROOT" apply --reverse --check "$REGDB_PATCH" 2>/dev/null; then
-  :
-elif git -C "$BUILDROOT" apply --check "$REGDB_PATCH" 2>/dev/null; then
-  git -C "$BUILDROOT" apply "$REGDB_PATCH"
-else
-  echo "wireless-regdb customization patch does not apply to the pinned OpenWrt source" >&2
-  exit 1
+if [[ "$CUSTOM_WIRELESS_REGDB" = 1 ]]; then
+  install -D -m 0755 "$PROJECT_DIR/scripts/customize-wireless-regdb.py" "$REGDB_PACKAGE_DIR/customize-wireless-regdb.py"
+  if git -C "$BUILDROOT" apply --ignore-space-change --reverse --check "$REGDB_PATCH" 2>/dev/null; then
+    :
+  elif git -C "$BUILDROOT" apply --ignore-space-change --check "$REGDB_PATCH" 2>/dev/null; then
+    git -C "$BUILDROOT" apply --ignore-space-change "$REGDB_PATCH"
+  else
+    echo "wireless-regdb customization patch does not apply to the pinned OpenWrt source" >&2
+    exit 1
+  fi
+elif git -C "$BUILDROOT" apply --ignore-space-change --reverse --check "$REGDB_PATCH" 2>/dev/null; then
+  git -C "$BUILDROOT" apply --ignore-space-change --reverse "$REGDB_PATCH"
 fi
 
 if ! grep -Fqx "src-git-full awg $AMNEZIAWG_FEED_REPOSITORY^$AMNEZIAWG_FEED_COMMIT" "$BUILDROOT/feeds.conf.default"; then
@@ -109,6 +120,8 @@ make download -j"$JOBS"
 make -j"$JOBS" V=s
 popd >/dev/null
 
-BUILDROOT="$BUILDROOT" bash "$PROJECT_DIR/scripts/verify-custom-regdb.sh"
+if [[ "$CUSTOM_WIRELESS_REGDB" = 1 ]]; then
+  BUILDROOT="$BUILDROOT" bash "$PROJECT_DIR/scripts/verify-custom-regdb.sh"
+fi
 BUILDROOT="$BUILDROOT" "$PROJECT_DIR/scripts/collect-artifacts.sh"
 BUILDROOT="$BUILDROOT" "$PROJECT_DIR/scripts/verify-build.sh"
