@@ -22,9 +22,14 @@ OpenWrt.
 В PowerShell из корня репозитория:
 
 ```powershell
-docker build --tag flint2-openwrt-builder:25.12.5 .
-docker run --rm --user builder --mount "type=bind,src=$((Get-Location).Path),dst=/workspace" flint2-openwrt-builder:25.12.5 ./build.sh
+.\build-docker.ps1
 ```
+
+Скрипт хранит тяжёлый OpenWrt buildroot в именованном Docker volume, то есть в
+Linux filesystem Docker Desktop, а не в OneDrive/NTFS. Это исключает медленные
+массовые операции с файлами и сохраняет кэш между сборками. Для повторной
+сборки с восемью потоками используется та же команда; число потоков меняется
+так: `.\build-docker.ps1 -Jobs 12`.
 
 Готовые `factory.bin`, `sysupgrade.bin`, manifest и `SHA256SUMS` появятся в
 `artifacts/`. Сценарий останавливается при несоответствии source commit или
@@ -59,4 +64,3 @@ docker run --rm --user builder --mount "type=bind,src=$((Get-Location).Path),dst
 Проверяются загрузка `kmod-amneziawg`, временный интерфейс `awg-test`, Wi-Fi,
 firewall4 и nftables. Это не заменяет тест пропускной способности, DFS и
 клиентской совместимости в вашей радиосреде.
-
