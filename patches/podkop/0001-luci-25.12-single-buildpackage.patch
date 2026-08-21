@@ -16,7 +16,7 @@ diff --git a/luci-app-podkop/Makefile b/luci-app-podkop/Makefile
 index e2df031..a79f706 100644
 --- a/luci-app-podkop/Makefile
 +++ b/luci-app-podkop/Makefile
-@@ -25,4 +25,3 @@ define Package/$(PKG_NAME)/install
+@@ -27,4 +27,3 @@ define Package/$(PKG_NAME)/install
  	sed -i -e 's/__COMPILED_VERSION_VARIABLE__/$(PKG_VERSION)/g' $(1)$(HTDOCS)/luci-static/resources/view/podkop/main.js || true
  endef
  
