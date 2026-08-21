@@ -162,6 +162,7 @@ test -f "$ROOTFS/usr/lib/lua/luci/i18n/vpn-dashboard.ru.lmo" || fail "VPN Dashbo
 ! grep -q 'private_key\|preshared_key' "$ROOTFS/etc/config/vpn-dashboard" || fail "VPN Dashboard default config contains a secret"
 for executable in etc/init.d/vpn-dashboard etc/hotplug.d/iface/90-vpn-dashboard usr/libexec/vpn-dashboard-sync-podkop usr/libexec/vpn-dashboard-peer; do
   test -x "$ROOTFS/$executable" || fail "VPN Dashboard executable is not executable: $executable"
+  ! grep -q "$(printf '\r')" "$ROOTFS/$executable" || fail "VPN Dashboard executable has CRLF line endings: $executable"
 done
 
 for required in config.buildinfo feeds.buildinfo version.buildinfo packages.manifest openwrt-sha256sums BUILD_INFO.txt SBOM.spdx SHA256SUMS; do

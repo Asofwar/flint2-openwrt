@@ -158,6 +158,7 @@ configure_server() {
 	chmod 0600 /etc/config/network /etc/config/vpn-dashboard
 	uci -q commit firewall
 	/etc/init.d/network reload
+	ifup "$interface"
 	/etc/init.d/firewall reload
 	logger -t vpn-dashboard "AmneziaWG server $interface configured: policy=$policy isolation=$client_isolation"
 }
