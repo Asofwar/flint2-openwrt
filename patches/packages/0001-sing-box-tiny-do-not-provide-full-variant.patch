@@ -1,0 +1,26 @@
+From b90ef3967831797b8e54364e25b4ffb73ff34f33 Mon Sep 17 00:00:00 2001
+From: Андрей Зубченко <Asofwar@users.noreply.github.com>
+Date: Fri, 21 Aug 2026 15:45:00 +0300
+Subject: [PATCH] sing-box: keep tiny variant distinct from full package
+
+Podkop 0.7.22 requires the full sing-box package. In the 25.12 package feed,
+the tiny variant virtually provides the same package name while the full
+variant conflicts with it. Kconfig then creates a dependency cycle for a
+consumer selecting full sing-box. This image does not select tiny; remove only
+its virtual provide so the full package remains selectable and all optional
+full-variant features remain available.
+---
+ net/sing-box/Makefile | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/net/sing-box/Makefile b/net/sing-box/Makefile
+index 2bbd025..523276d 100644
+--- a/net/sing-box/Makefile
++++ b/net/sing-box/Makefile
+@@ -49,6 +49,5 @@ define Package/sing-box-tiny
+   $(Package/sing-box-default)
+   TITLE+= (tiny)
+-  PROVIDES:=sing-box
+   VARIANT:=tiny
+   CONFLICTS:=sing-box
+ endef

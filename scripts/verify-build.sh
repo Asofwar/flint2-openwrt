@@ -14,8 +14,10 @@ grep -qx 'CONFIG_PACKAGE_kmod-amneziawg=y' "$CONFIG" || fail "AmneziaWG kmod was
 grep -qx 'CONFIG_PACKAGE_luci-proto-amneziawg=y' "$CONFIG" || fail "AmneziaWG LuCI protocol was not selected"
 grep -qx 'CONFIG_PACKAGE_podkop=y' "$CONFIG" || fail "Podkop was not selected"
 grep -qx 'CONFIG_PACKAGE_luci-app-podkop=y' "$CONFIG" || fail "Podkop LuCI was not selected"
+grep -qx 'CONFIG_PACKAGE_luci-i18n-podkop-ru=y' "$CONFIG" || fail "Podkop Russian translation was not selected"
+grep -qx 'CONFIG_PACKAGE_sing-box=y' "$CONFIG" || fail "full sing-box was not selected"
+grep -q '^# CONFIG_PACKAGE_sing-box-tiny is not set$' "$CONFIG" || fail "sing-box-tiny must not replace the full variant"
 test -n "$(find "$IMAGE_DIR" -maxdepth 1 -name '*gl-mt6000*sysupgrade.bin' -print -quit)" || fail "sysupgrade image absent"
 test -n "$(find "$IMAGE_DIR" -maxdepth 1 -name '*gl-mt6000*factory.bin' -print -quit)" || fail "factory image absent"
 test -f "$IMAGE_DIR/sha256sums" || fail "upstream SHA256 file absent"
 echo "VERIFY PASSED: GL-MT6000 images and required selected packages are present."
-

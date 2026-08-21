@@ -32,6 +32,13 @@ fi
 
 pushd "$BUILDROOT" >/dev/null
 ./scripts/feeds update -a
+SINGBOX_PATCH="$PROJECT_DIR/patches/packages/0001-sing-box-tiny-do-not-provide-full-variant.patch"
+if git -C feeds/packages apply --check "$SINGBOX_PATCH"; then
+  git -C feeds/packages apply "$SINGBOX_PATCH"
+elif ! git -C feeds/packages apply --reverse --check "$SINGBOX_PATCH"; then
+  echo "sing-box compatibility patch does not apply to the pinned source" >&2
+  exit 1
+fi
 PODKOP_PATCH="$PROJECT_DIR/patches/podkop/0001-luci-25.12-single-buildpackage.patch"
 if git -C feeds/podkop apply --check "$PODKOP_PATCH"; then
   git -C feeds/podkop apply "$PODKOP_PATCH"
