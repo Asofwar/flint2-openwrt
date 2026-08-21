@@ -1,0 +1,6 @@
+#!/bin/sh
+# Safe defaults only. VPN credentials and Podkop routes remain user-provided.
+uci -q set system.@system[0].zonename='Europe/Moscow'
+uci -q commit system
+exit 0
+

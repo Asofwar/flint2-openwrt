@@ -1,0 +1,29 @@
+name: Build Flint 2 OpenWrt
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build builder image
+        run: docker build --tag flint2-openwrt-builder:25.12.5 .
+      - name: Build firmware
+        run: docker run --rm --user builder --mount type=bind,src="$GITHUB_WORKSPACE",dst=/workspace flint2-openwrt-builder:25.12.5 ./build.sh
+      - name: Verify build
+        run: docker run --rm --user builder --mount type=bind,src="$GITHUB_WORKSPACE",dst=/workspace flint2-openwrt-builder:25.12.5 ./scripts/verify-build.sh
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: gl-mt6000-openwrt-25.12.5
+          path: artifacts/
+          if-no-files-found: error

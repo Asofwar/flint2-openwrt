@@ -1,0 +1,10 @@
+.work/
+artifacts/
+dl/
+tmp/
+bin/
+*.img
+*.bin
+*.manifest
+*.sha256
+
