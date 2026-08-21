@@ -32,6 +32,13 @@ fi
 
 pushd "$BUILDROOT" >/dev/null
 ./scripts/feeds update -a
+PODKOP_PATCH="$PROJECT_DIR/patches/podkop/0001-luci-25.12-single-buildpackage.patch"
+if git -C feeds/podkop apply --check "$PODKOP_PATCH"; then
+  git -C feeds/podkop apply "$PODKOP_PATCH"
+elif ! git -C feeds/podkop apply --reverse --check "$PODKOP_PATCH"; then
+  echo "Podkop compatibility patch does not apply to the pinned source" >&2
+  exit 1
+fi
 ./scripts/feeds install -a -p awg
 ./scripts/feeds install -a -p podkop
 cp "$PROJECT_DIR/configs/gl-mt6000.config" .config

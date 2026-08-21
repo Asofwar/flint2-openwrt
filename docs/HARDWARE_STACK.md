@@ -16,7 +16,7 @@
 | pesa1234 `next-r4.9.2.rss.mtk` | pesa1234/openwrt `9d46f811…` | out-of-tree, kernel 4.9 line | reference only | not ABI-compatible with Linux 6.12 and unsuitable as a broad backport | high |
 | 2.4 GHz 256-QAM / iBF / EDCCA GUI | pesa1234 trees | vendor/experimental | no | no validated 6.12-compatible implementation or regulatory-safe control plane | medium/high |
 | AmneziaWG kernel module | awg-openwrt `98b9eaf2…` | external package source | yes | compiled by this buildroot against its exact kernel ABI | medium |
-| Podkop 0.7.22 | itdoginfo/podkop `c0a2736b…` | external package source | yes | its upstream Makefile controls dependencies and conflicts | medium |
+| Podkop 0.7.22 | itdoginfo/podkop `c0a2736b…` + local compatibility patch | external package source | yes | its dependencies/conflicts are upstream; one obsolete LuCI registration is removed for 25.12 | medium |
 
 ## Решения по pesa1234
 
@@ -36,9 +36,17 @@ Pinned Makefile Podkop 0.7.22 требует `sing-box`, `curl`, `jq`,
 firewall4/nftables/TProxy и policy routing; outbound AmneziaWG пользователь
 создаёт в LuCI самостоятельно — ключей и фиктивных туннелей в образе нет.
 
+### Patch `0001-luci-25.12-single-buildpackage.patch`
+
+В v0.7.22 после подключения актуального `luci.mk` приложение Podkop
+регистрируется дважды: сам `luci.mk` уже вызывает `BuildPackage`, а Makefile
+Podkop вызывает его повторно. Это создаёт дублирующийся Kconfig symbol и
+рекурсивную зависимость. Патч удаляет только устаревший второй вызов; исходные
+зависимости Podkop, `sing-box` и перевод `luci-i18n-podkop-ru` остаются
+управляемыми upstream `luci.mk`.
+
 ## Ограничения проверки
 
 Сборка проверяет состав и ABI-целостность на уровне единого buildroot. Работа
 Wi-Fi, 2.5GbE, DFS, WED и реальная селективная маршрутизация требуют теста на
 физическом GL-MT6000; для него предусмотрен `scripts/hardware-test.sh`.
-
