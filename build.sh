@@ -58,6 +58,16 @@ make defconfig
 mkdir -p files
 cp -a "$PROJECT_DIR/files/." files/
 install -D -m 0755 "$PROJECT_DIR/scripts/flint2-info.sh" files/usr/bin/flint2-info
+mkdir -p files/etc/apk/repositories.d
+cat > files/etc/apk/repositories.d/distfeeds.list <<EOF
+https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}/targets/mediatek/filogic/packages/packages.adb
+https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}/packages/aarch64_cortex-a53/base/packages.adb
+https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}/packages/aarch64_cortex-a53/luci/packages.adb
+https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}/packages/aarch64_cortex-a53/packages/packages.adb
+https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}/packages/aarch64_cortex-a53/routing/packages.adb
+https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}/packages/aarch64_cortex-a53/telephony/packages.adb
+https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}/packages/aarch64_cortex-a53/video/packages.adb
+EOF
 cat > files/etc/flint2-build-info <<EOF
 OPENWRT_VERSION=$OPENWRT_VERSION
 OPENWRT_COMMIT=$OPENWRT_COMMIT

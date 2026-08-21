@@ -26,11 +26,13 @@ SYSUPGRADE="$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl-mt6000*sysupgrade
 FACTORY="$(find "$IMAGE_DIR" -maxdepth 1 -type f -name '*gl-mt6000*factory.bin' -print -quit)"
 KERNEL_CONFIG="$(find "$BUILDROOT/build_dir" -path "*/linux-mediatek_filogic/linux-$OPENWRT_KERNEL/.config" -print -quit)"
 FLINT2_INFO="$(find "$BUILDROOT/build_dir" -path '*/root-mediatek/usr/bin/flint2-info' -type f -print -quit)"
+APK_REPOS="$(find "$BUILDROOT/build_dir" -path '*/root-mediatek/etc/apk/repositories.d/distfeeds.list' -type f -print -quit)"
 test -n "$MANIFEST" || fail "GL-MT6000 manifest absent"
 test -n "$SYSUPGRADE" || fail "GL-MT6000 sysupgrade image absent"
 test -n "$FACTORY" || fail "GL-MT6000 factory image absent"
 test -n "$KERNEL_CONFIG" || fail "resolved kernel config absent"
 test -n "$FLINT2_INFO" || fail "flint2-info is absent from the root filesystem"
+test -n "$APK_REPOS" || fail "official APK repository list is absent from the root filesystem"
 test -f "$IMAGE_DIR/sha256sums" || fail "upstream SHA256 file absent"
 
 grep -qx 'CONFIG_TARGET_mediatek=y' "$CONFIG" || fail "wrong target"
@@ -92,6 +94,19 @@ config_enabled jq
 config_enabled coreutils-base64
 grep -qx 'CONFIG_BRIDGE_VLAN_FILTERING=y' "$KERNEL_CONFIG" || fail "kernel bridge VLAN filtering is disabled"
 grep -qx 'CONFIG_VLAN_8021Q=y' "$KERNEL_CONFIG" || fail "kernel 802.1Q VLAN support is disabled"
+
+official_apk_base="https://downloads.openwrt.org/releases/${OPENWRT_VERSION#v}"
+for repository in \
+  "$official_apk_base/targets/mediatek/filogic/packages/packages.adb" \
+  "$official_apk_base/packages/aarch64_cortex-a53/base/packages.adb" \
+  "$official_apk_base/packages/aarch64_cortex-a53/luci/packages.adb" \
+  "$official_apk_base/packages/aarch64_cortex-a53/packages/packages.adb" \
+  "$official_apk_base/packages/aarch64_cortex-a53/routing/packages.adb" \
+  "$official_apk_base/packages/aarch64_cortex-a53/telephony/packages.adb" \
+  "$official_apk_base/packages/aarch64_cortex-a53/video/packages.adb"; do
+  grep -Fqx "$repository" "$APK_REPOS" || fail "official APK repository is missing: $repository"
+done
+test "$(grep -vc '^[[:space:]]*\(#\|$\)' "$APK_REPOS")" -eq 7 || fail "APK repository list contains non-official entries"
 
 has_apk "kmod-amneziawg-${OPENWRT_KERNEL}*.apk"
 has_apk 'amneziawg-tools-*.apk'

@@ -103,6 +103,12 @@ request, однако в GitHub он сейчас вручную отключё�
 также фактические версии mt76/mac80211, MT7986 firmware и sing-box из манифеста
 собранного образа.
 
+В `/etc/apk/repositories.d/distfeeds.list` встроены официальные HTTPS-репозитории
+закреплённого OpenWrt release для `mediatek/filogic` и `aarch64_cortex-a53`:
+target/kmod, `base`, `luci`, `packages`, `routing`, `telephony` и `video`.
+AWG и Podkop уже включены в образ из единой сборки; отдельные неофициальные
+APK-репозитории для них намеренно не добавляются.
+
 Проверка перед прошивкой:
 
 ```bash
