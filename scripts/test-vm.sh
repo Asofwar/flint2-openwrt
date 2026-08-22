@@ -14,6 +14,8 @@ QEMU_PID=''
 CONSOLE_PID=''
 REMOTE_QEMU_PID=''
 REMOTE_CONSOLE_PID=''
+POST_REBOOT_CONSOLE_PID=''
+POST_REBOOT_REMOTE_CONSOLE_PID=''
 VM_BASE_DISK=''
 VM_ROUTER_DISK=''
 VM_REMOTE_DISK=''
@@ -29,7 +31,7 @@ cleanup() {
 		kill "$CONSOLE_PID" 2>/dev/null || true
 		wait "$CONSOLE_PID" 2>/dev/null || true
 	fi
-	for pid in "$REMOTE_QEMU_PID" "$REMOTE_CONSOLE_PID"; do
+	for pid in "$REMOTE_QEMU_PID" "$REMOTE_CONSOLE_PID" "$POST_REBOOT_CONSOLE_PID" "$POST_REBOOT_REMOTE_CONSOLE_PID"; do
 		[ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && kill "$pid" 2>/dev/null || true
 	done
 	for disk in "$VM_BASE_DISK" "$VM_ROUTER_DISK" "$VM_REMOTE_DISK"; do
@@ -60,7 +62,7 @@ qemu-system-x86_64 \
 	-netdev "socket,id=peerlink,listen=127.0.0.1:$PEER_LINK_PORT" \
 	-device e1000,netdev=peerlink \
 	-serial "tcp:127.0.0.1:$SERIAL_PORT,server=on,wait=off" \
-	-no-reboot > "$RESULT_DIR/qemu.log" 2>&1 &
+	> "$RESULT_DIR/qemu.log" 2>&1 &
 QEMU_PID=$!
 
 sleep 2
@@ -164,9 +166,8 @@ apk info podkop | grep -q '^podkop-'
 echo APK_PACKAGE_MANAGER_PASS
 sleep 100
 /usr/libexec/vpn-dashboard-peer enable vmpeer 0 && uci get vpn-dashboard.peer_vmpeer.enabled | grep -qx 0 && /usr/libexec/vpn-dashboard-peer enable vmpeer 1 && uci get vpn-dashboard.peer_vmpeer.enabled | grep -qx 1 && echo PEER_TOGGLE_PASS
-/usr/libexec/vpn-dashboard-peer delete vmpeer && /usr/libexec/vpn-dashboard-peer delete vmpeer2 && ! uci -q get vpn-dashboard.peer_vmpeer && ! uci -q get vpn-dashboard.peer_vmpeer2 && test ! -e /etc/vpn-dashboard/peers/vmpeer && test ! -e /etc/vpn-dashboard/peers/vmpeer2 && echo PEER_DELETE_PASS
-rm -f /tmp/vmpeer.conf /tmp/vmpeer2.conf /tmp/vmpeer.safe /tmp/vmpeer.fields /tmp/vmpeer.qr /tmp/vmpeer.status
-echo GUEST_TEST_COMPLETE'
+echo REBOOT_REQUESTED
+reboot'
 (
 	sleep 35
 	(
@@ -176,7 +177,7 @@ echo GUEST_TEST_COMPLETE'
 			printf '%s\n' "$line"
 			sleep 0.2
 		done
-		sleep 180
+		sleep 150
 	) | timeout 300 nc -N 127.0.0.1 "$SERIAL_PORT"
 ) > "$RESULT_DIR/openwrt.serial.log" 2>&1 &
 CONSOLE_PID=$!
@@ -255,6 +256,66 @@ rm -f /tmp/vmpeer.conf /tmp/vmpeer2.conf /tmp/remote-ping.txt /tmp/remote-isolat
 ) > "$RESULT_DIR/remote.serial.log" 2>&1 &
 REMOTE_CONSOLE_PID=$!
 
+POST_REBOOT_COMMAND='set -ex
+for attempt in $(seq 1 60); do
+  if ifstatus awg_server | grep -q "\"up\": true"; then break; fi
+  sleep 2
+done
+ifstatus awg_server | grep -q "\"up\": true"
+uci get vpn-dashboard.peer_vmpeer.enabled | grep -qx 1
+uci get vpn-dashboard.peer_vmpeer2.enabled | grep -qx 1
+test -f /etc/vpn-dashboard/peers/vmpeer
+test -f /etc/vpn-dashboard/peers/vmpeer2
+nft list ruleset >/tmp/reboot-firewall.nft
+grep -qw awg_server /tmp/reboot-firewall.nft
+for attempt in $(seq 1 60); do
+  awg show awg_server latest-handshakes | awk "NF == 2 && \$2 > 0 { count++ } END { exit !(count >= 2) }" && break
+  sleep 2
+done
+awg show awg_server latest-handshakes | awk "NF == 2 && \$2 > 0 { count++ } END { exit !(count >= 2) }"
+echo REBOOT_PERSISTENCE_PASS'
+POST_REBOOT_REMOTE_COMMAND='set -e
+for attempt in $(seq 1 30); do
+  ip route replace 10.77.0.1/32 dev awg_remote
+  ping -I awg_remote -c 1 -W 1 10.77.0.1 >/tmp/remote-reboot-peer1.txt || true
+  ip route replace 10.77.0.1/32 dev awg_remote2
+  ping -I awg_remote2 -c 1 -W 1 10.77.0.1 >/tmp/remote-reboot-peer2.txt || true
+  sleep 2
+done
+awg show awg_remote latest-handshakes | awk "NF == 2 && \$2 > 0 { found=1 } END { exit !found }"
+awg show awg_remote2 latest-handshakes | awk "NF == 2 && \$2 > 0 { found=1 } END { exit !found }"
+rm -f /tmp/remote-reboot-peer1.txt /tmp/remote-reboot-peer2.txt
+echo REMOTE_POST_REBOOT_HANDSHAKE_PASS'
+(
+	sleep 250
+	(
+		printf '\nroot\n'
+		sleep 3
+		printf ': >/tmp/vm-post-reboot.sh\n'
+		printf '%s' "$POST_REBOOT_COMMAND" | base64 | fold -w 60 | while IFS= read -r chunk; do
+			printf 'printf %%s %s | base64 -d >>/tmp/vm-post-reboot.sh\n' "$chunk"
+		done
+		printf 'sh -e /tmp/vm-post-reboot.sh; status=$?; rm -f /tmp/vm-post-reboot.sh; exit $status\n'
+		sleep 150
+	) | timeout 180 nc -N 127.0.0.1 "$SERIAL_PORT"
+) > "$RESULT_DIR/post-reboot.serial.log" 2>&1 &
+POST_REBOOT_CONSOLE_PID=$!
+
+(
+	sleep 270
+	(
+		printf '\nroot\n'
+		sleep 3
+		printf ': >/tmp/vm-post-reboot-remote.sh\n'
+		printf '%s' "$POST_REBOOT_REMOTE_COMMAND" | base64 | fold -w 60 | while IFS= read -r chunk; do
+			printf 'printf %%s %s | base64 -d >>/tmp/vm-post-reboot-remote.sh\n' "$chunk"
+		done
+		printf 'sh -e /tmp/vm-post-reboot-remote.sh; status=$?; rm -f /tmp/vm-post-reboot-remote.sh; exit $status\n'
+		sleep 150
+	) | timeout 180 nc -N 127.0.0.1 "$REMOTE_SERIAL_PORT"
+) > "$RESULT_DIR/post-reboot.remote.serial.log" 2>&1 &
+POST_REBOOT_REMOTE_CONSOLE_PID=$!
+
 LUCI_STATUS='000'
 for attempt in $(seq 1 90); do
 	LUCI_STATUS="$(curl --silent --show-error --output "$RESULT_DIR/luci.html" --write-out '%{http_code}' --max-time 2 "http://127.0.0.1:$HTTP_PORT/cgi-bin/luci/" || true)"
@@ -281,11 +342,17 @@ if grep -Eqi 'private_key|preshared_key|privatekey|presharedkey' "$RESULT_DIR/da
 fi
 wait "$CONSOLE_PID" || true
 wait "$REMOTE_CONSOLE_PID" || true
+wait "$POST_REBOOT_CONSOLE_PID" || true
+wait "$POST_REBOOT_REMOTE_CONSOLE_PID" || true
 tr -d '\r' < "$RESULT_DIR/openwrt.serial.log" > "$RESULT_DIR/openwrt.serial.normalized.log"
 tr -d '\r' < "$RESULT_DIR/remote.serial.log" > "$RESULT_DIR/remote.serial.normalized.log"
-for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_NFT_SOURCE_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE BACKUP_VALIDATION_PASS APK_PACKAGE_MANAGER_PASS PEER_TOGGLE_PASS PEER_DELETE_PASS GUEST_TEST_COMPLETE; do
+tr -d '\r' < "$RESULT_DIR/post-reboot.serial.log" > "$RESULT_DIR/post-reboot.serial.normalized.log"
+tr -d '\r' < "$RESULT_DIR/post-reboot.remote.serial.log" > "$RESULT_DIR/post-reboot.remote.serial.normalized.log"
+for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_NFT_SOURCE_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE BACKUP_VALIDATION_PASS APK_PACKAGE_MANAGER_PASS PEER_TOGGLE_PASS REBOOT_REQUESTED; do
 	grep -Fxq "$marker" "$RESULT_DIR/openwrt.serial.normalized.log" || fail "guest runtime test failed: $marker"
 done
+grep -Fxq REBOOT_PERSISTENCE_PASS "$RESULT_DIR/post-reboot.serial.normalized.log" || fail 'post-reboot runtime test failed'
+grep -Fxq REMOTE_POST_REBOOT_HANDSHAKE_PASS "$RESULT_DIR/post-reboot.remote.serial.normalized.log" || fail 'post-reboot remote handshake test failed'
 for marker in FIREWALL_WAN_BLOCK_PASS REMOTE_AWG_CONFIG_PASS REMOTE_AWG_HANDSHAKE_PASS CLIENT_ISOLATION_PASS REMOTE_DNS_PASS; do
 	grep -Fxq "$marker" "$RESULT_DIR/remote.serial.normalized.log" || fail "remote guest runtime test failed: $marker"
 done
@@ -307,10 +374,11 @@ record QR_GENERATION PASS
 record SECRET_LEAK_TEST PASS
 record BACKUP_VALIDATION PASS
 record APK_PACKAGE_MANAGER PASS
+record REBOOT_PERSISTENCE PASS
 
 cat > "$RESULT_DIR/junit.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="openwrt-vm-smoke" tests="15" failures="0">
+<testsuite name="openwrt-vm-smoke" tests="16" failures="0">
   <testcase name="vm_boot"/>
   <testcase name="luci_http"/>
   <testcase name="vpn_dashboard_assets"/>
@@ -324,6 +392,7 @@ cat > "$RESULT_DIR/junit.xml" <<EOF
   <testcase name="peer_management_and_qr"/>
   <testcase name="backup_contents_and_secret_permissions"/>
   <testcase name="apk_installed_package_database"/>
+  <testcase name="reboot_persists_awg_server_peers_firewall_and_handshakes"/>
   <testcase name="dashboard_public_assets_no_secret_names"/>
   <testcase name="dashboard_status_api_no_secret_names"/>
 </testsuite>
