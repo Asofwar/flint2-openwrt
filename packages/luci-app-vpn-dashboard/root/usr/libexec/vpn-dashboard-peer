@@ -190,7 +190,7 @@ peer_status() {
 	now="$(date +%s)"
 	online=0
 	[ "$handshake" -gt 0 ] 2>/dev/null && [ $((now - handshake)) -le 180 ] && online=1
-	[ -n "$peer_json_first" ] || printf ','
+	[ -z "$peer_json_first" ] || printf ','
 	peer_json_first=1
 	printf '{"id":"%s","name":"%s","address":"%s","public_key":"%s","enabled":%s,"online":%s,"last_handshake":%s,"rx":%s,"tx":%s,"created":"%s"}' \
 		"$id" "$name" "$address" "$public_key" "$([ "$enabled" = 1 ] && echo true || echo false)" "$([ "$online" = 1 ] && echo true || echo false)" "$handshake" "$rx" "$tx" "$created"
@@ -204,11 +204,42 @@ status() {
 	printf ']}\n'
 }
 
+podkop_rule_count() {
+	local option value count=0
+	for option in "$@"; do
+		value="$(uci -q get podkop.main."$option")"
+		[ -n "$value" ] || continue
+		count=$((count + $(printf '%s\n' "$value" | awk 'NF { for (i = 1; i <= NF; i++) count++ } END { print count + 0 }')))
+	done
+	printf '%s' "$count"
+}
+
+tunnel_status() {
+	local section="$1" proto disabled mtu endpoint endpoint_port
+	[ "$section" = "$server_interface" ] && return 0
+	valid_id "$section" || return 0
+	config_get proto "$section" proto
+	case "$proto" in wireguard|amneziawg) ;; *) return 0;; esac
+	config_get disabled "$section" disabled 0
+	config_get mtu "$section" mtu ''
+	endpoint="$(uci -q get network.wireguard_"$section".endpoint_host)"
+	endpoint_port="$(uci -q get network.wireguard_"$section".endpoint_port)"
+	validate_endpoint "$endpoint" || endpoint=''
+	case "$endpoint_port" in ''|*[!0-9]* ) endpoint_port='';; esac
+	[ -n "$endpoint" ] && [ -n "$endpoint_port" ] && endpoint="$endpoint:$endpoint_port"
+	case "$mtu" in ''|*[!0-9]* ) mtu='';; esac
+	[ -z "$tunnel_json_first" ] || printf ','
+	tunnel_json_first=1
+	printf '{"name":"%s","protocol":"%s","disabled":%s,"mtu":"%s","endpoint":"%s"}' \
+		"$section" "$proto" "$([ "$disabled" = 1 ] && echo true || echo false)" "$mtu" "$endpoint"
+}
+
 dashboard_status() {
-	local source sources enabled policy wan_address wan_status cgnat
+	local source sources enabled policy wan_address wan_status cgnat outbound outbound_type domain_rules subnet_rules
 	load_server
 	config_get enabled main enabled 0
 	config_get policy main podkop_policy same_as_lan
+	case "$policy" in same_as_lan|direct) ;; *) policy='';; esac
 	wan_status="$(ubus call network.interface.wan status 2>/dev/null)"
 	wan_address=''
 	[ -n "$wan_status" ] && wan_address="$(printf '%s' "$wan_status" | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null)"
@@ -225,8 +256,18 @@ dashboard_status() {
 		[ -n "$sources" ] && sources="$sources, "
 		sources="$sources$source"
 	done
-	printf '{"interface":"%s","server_enabled":%s,"policy":"%s","podkop_sources":"%s","wan_address":"%s","cgnat":%s}\n' \
-		"$server_interface" "$([ "$enabled" = 1 ] && echo true || echo false)" "$policy" "$sources" "$wan_address" "$cgnat"
+	outbound="$(uci -q get podkop.main.interface)"
+	outbound_type="$(uci -q get podkop.main.connection_type)"
+	valid_id "$outbound" || outbound=''
+	case "$outbound_type" in ''|*[!A-Za-z0-9_-]* ) outbound_type='';; esac
+	domain_rules="$(podkop_rule_count user_domains_text user_domains local_domain_lists remote_domain_lists)"
+	subnet_rules="$(podkop_rule_count user_subnets_text user_subnets local_subnet_lists remote_subnet_lists)"
+	printf '{"interface":"%s","server_enabled":%s,"policy":"%s","podkop_sources":"%s","podkop_outbound":"%s","podkop_connection_type":"%s","podkop_domain_rules":%s,"podkop_subnet_rules":%s,"wan_address":"%s","cgnat":%s,"tunnels":[' \
+		"$server_interface" "$([ "$enabled" = 1 ] && echo true || echo false)" "$policy" "$sources" "$outbound" "$outbound_type" "$domain_rules" "$subnet_rules" "$wan_address" "$cgnat"
+	config_load network
+	tunnel_json_first=''
+	config_foreach tunnel_status interface
+	printf ']}\n'
 }
 
 set_enabled() {

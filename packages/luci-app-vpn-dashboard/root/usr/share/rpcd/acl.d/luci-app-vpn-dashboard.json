@@ -4,12 +4,12 @@
     "read": {
       "ubus": { "network.interface": [ "dump" ], "service": [ "list" ], "file": [ "exec" ] },
       "uci": [ "vpn-dashboard" ],
-      "file": { "/usr/libexec/vpn-dashboard-peer": [ "exec" ], "/usr/libexec/vpn-dashboard-logs": [ "exec" ] }
+      "file": { "/usr/libexec/vpn-dashboard-peer": [ "exec" ], "/usr/libexec/vpn-dashboard-logs": [ "exec" ], "/usr/libexec/vpn-dashboard-tunnel": [ "exec" ] }
     },
     "write": {
       "uci": [ "vpn-dashboard" ],
       "ubus": { "luci": [ "setInitAction" ], "file": [ "exec" ] },
-      "file": { "/usr/libexec/vpn-dashboard-peer": [ "exec" ], "/usr/libexec/vpn-dashboard-logs": [ "exec" ] }
+      "file": { "/usr/libexec/vpn-dashboard-peer": [ "exec" ], "/usr/libexec/vpn-dashboard-logs": [ "exec" ], "/usr/libexec/vpn-dashboard-tunnel": [ "exec" ] }
     }
   }
 }

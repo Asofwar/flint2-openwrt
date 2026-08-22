@@ -157,12 +157,13 @@ for required in \
   lib/upgrade/keep.d/vpn-dashboard \
   usr/libexec/vpn-dashboard-sync-podkop \
   usr/libexec/vpn-dashboard-peer \
-  usr/libexec/vpn-dashboard-logs; do
+  usr/libexec/vpn-dashboard-logs \
+  usr/libexec/vpn-dashboard-tunnel; do
   test -f "$ROOTFS/$required" || fail "VPN Dashboard rootfs file is absent: $required"
 done
 test -f "$ROOTFS/usr/lib/lua/luci/i18n/vpn-dashboard.ru.lmo" || fail "VPN Dashboard Russian translation is absent"
 ! grep -q 'private_key\|preshared_key' "$ROOTFS/etc/config/vpn-dashboard" || fail "VPN Dashboard default config contains a secret"
-for executable in etc/init.d/vpn-dashboard etc/hotplug.d/iface/90-vpn-dashboard usr/libexec/vpn-dashboard-sync-podkop usr/libexec/vpn-dashboard-peer usr/libexec/vpn-dashboard-logs; do
+for executable in etc/init.d/vpn-dashboard etc/hotplug.d/iface/90-vpn-dashboard usr/libexec/vpn-dashboard-sync-podkop usr/libexec/vpn-dashboard-peer usr/libexec/vpn-dashboard-logs usr/libexec/vpn-dashboard-tunnel; do
   test -x "$ROOTFS/$executable" || fail "VPN Dashboard executable is not executable: $executable"
   ! grep -q "$(printf '\r')" "$ROOTFS/$executable" || fail "VPN Dashboard executable has CRLF line endings: $executable"
 done

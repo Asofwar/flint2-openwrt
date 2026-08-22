@@ -1,0 +1,33 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+die() {
+	echo "vpn-dashboard-tunnel: $*" >&2
+	exit 1
+}
+
+valid_interface() {
+	case "$1" in ''|*[!A-Za-z0-9_]* ) return 1;; esac
+	[ "${#1}" -le 40 ]
+}
+
+action="$1"
+interface="$2"
+
+case "$action" in up|down|restart) ;; *) die 'unknown action';; esac
+valid_interface "$interface" || die 'invalid interface name'
+
+config_load vpn-dashboard
+config_get server_interface main interface awg_server
+[ "$interface" != "$server_interface" ] || die 'the local server interface is not an outbound tunnel'
+
+config_load network
+config_get protocol "$interface" proto
+case "$protocol" in wireguard|amneziawg) ;; *) die 'interface is not a WireGuard or AmneziaWG tunnel';; esac
+
+case "$action" in
+	up) /sbin/ifup "$interface";;
+	down) /sbin/ifdown "$interface";;
+	restart) /sbin/ifdown "$interface"; /sbin/ifup "$interface";;
+esac

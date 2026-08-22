@@ -146,6 +146,17 @@ grep -qw "$device" /tmp/podkop-interfaces.nft
 /usr/bin/podkop stop
 rm -f /tmp/podkop-interfaces.nft
 echo PODKOP_NFT_SOURCE_PASS
+uci set network.awg_out=interface
+uci set network.awg_out.proto=amneziawg
+uci set network.awg_out.mtu=1280
+uci set network.wireguard_awg_out=wireguard_awg_out
+uci set network.wireguard_awg_out.endpoint_host=vpn.example.test
+uci set network.wireguard_awg_out.endpoint_port=51820
+uci commit network
+/usr/libexec/vpn-dashboard-peer dashboard >/tmp/vpn-dashboard.json
+jq -e ".tunnels[] | select(.name == \"awg_out\" and .protocol == \"amneziawg\" and .mtu == \"1280\" and .endpoint == \"vpn.example.test:51820\")" /tmp/vpn-dashboard.json >/dev/null
+! /usr/libexec/vpn-dashboard-tunnel up awg_server
+echo VPN_TUNNEL_DASHBOARD_PASS
 /usr/libexec/vpn-dashboard-peer create vmpeer full >/tmp/vmpeer.conf
 /usr/libexec/vpn-dashboard-peer create vmpeer2 full >/tmp/vmpeer2.conf
 cp /tmp/vmpeer.conf /www/vmpeer.conf
@@ -378,6 +389,7 @@ curl --silent --show-error --fail --max-time 10 "http://127.0.0.1:$HTTP_PORT/luc
 curl --silent --show-error --fail --max-time 10 "http://127.0.0.1:$HTTP_PORT/luci-static/resources/view/vpn-dashboard/clients.js" > "$RESULT_DIR/clients.js"
 test -s "$RESULT_DIR/dashboard.js" || fail 'VPN Dashboard JavaScript is absent from the running image'
 test -s "$RESULT_DIR/clients.js" || fail 'peer-management JavaScript is absent from the running image'
+grep -Fq 'sourceText.split(/,\s*/)' "$RESULT_DIR/dashboard.js" || fail 'Dashboard does not split the Podkop source interface list correctly'
 if grep -Eqi 'private_key|preshared_key|privatekey|presharedkey' "$RESULT_DIR/dashboard.js" "$RESULT_DIR/clients.js"; then
 	fail 'public Dashboard assets contain a secret field name'
 fi
@@ -389,7 +401,7 @@ tr -d '\r' < "$RESULT_DIR/openwrt.serial.log" > "$RESULT_DIR/openwrt.serial.norm
 tr -d '\r' < "$RESULT_DIR/remote.serial.log" > "$RESULT_DIR/remote.serial.normalized.log"
 tr -d '\r' < "$RESULT_DIR/post-reboot.serial.log" > "$RESULT_DIR/post-reboot.serial.normalized.log"
 tr -d '\r' < "$RESULT_DIR/post-reboot.remote.serial.log" > "$RESULT_DIR/post-reboot.remote.serial.normalized.log"
-for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_NFT_SOURCE_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE VPN_LOGS_SAFE_PASS BACKUP_VALIDATION_PASS APK_PACKAGE_MANAGER_PASS PEER_TOGGLE_PASS REBOOT_REQUESTED; do
+for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_NFT_SOURCE_PASS VPN_TUNNEL_DASHBOARD_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE VPN_LOGS_SAFE_PASS BACKUP_VALIDATION_PASS APK_PACKAGE_MANAGER_PASS PEER_TOGGLE_PASS REBOOT_REQUESTED; do
 	grep -Fxq "$marker" "$RESULT_DIR/openwrt.serial.normalized.log" || fail "guest runtime test failed: $marker"
 done
 grep -Fxq REBOOT_PERSISTENCE_PASS "$RESULT_DIR/post-reboot.serial.normalized.log" || fail 'post-reboot runtime test failed'
@@ -414,13 +426,14 @@ record PEER_MANAGEMENT PASS
 record QR_GENERATION PASS
 record SECRET_LEAK_TEST PASS
 record VPN_LOGS_SECURITY PASS
+record VPN_TUNNEL_DASHBOARD PASS
 record BACKUP_VALIDATION PASS
 record APK_PACKAGE_MANAGER PASS
 record REBOOT_PERSISTENCE PASS
 
 cat > "$RESULT_DIR/junit.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="openwrt-vm-smoke" tests="17" failures="0">
+<testsuite name="openwrt-vm-smoke" tests="18" failures="0">
   <testcase name="vm_boot"/>
   <testcase name="luci_http"/>
   <testcase name="vpn_dashboard_assets"/>
@@ -433,6 +446,7 @@ cat > "$RESULT_DIR/junit.xml" <<EOF
   <testcase name="podkop_nft_source_interface"/>
   <testcase name="peer_management_and_qr"/>
   <testcase name="vpn_logs_exclude_credentials"/>
+  <testcase name="vpn_tunnel_dashboard_state"/>
   <testcase name="backup_contents_and_secret_permissions"/>
   <testcase name="apk_installed_package_database"/>
   <testcase name="reboot_persists_awg_server_peers_firewall_and_handshakes"/>

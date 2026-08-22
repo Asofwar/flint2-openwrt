@@ -291,3 +291,96 @@ msgstr "Подходящих записей журнала нет."
 
 msgid "Only VPN-related system logs are shown. Lines containing credentials or keys are excluded."
 msgstr "Показываются только системные журналы VPN. Строки с учётными данными или ключами исключены."
+
+msgid "VPN client tunnels"
+msgstr "Клиентские VPN-туннели"
+
+msgid "Routing visualization"
+msgstr "Схема маршрутизации"
+
+msgid "Protocol"
+msgstr "Протокол"
+
+msgid "Interface"
+msgstr "Интерфейс"
+
+msgid "Endpoint"
+msgstr "Конечная точка"
+
+msgid "Virtual IP"
+msgstr "Виртуальный IP"
+
+msgid "Exit IP"
+msgstr "Выходной IP"
+
+msgid "Uptime"
+msgstr "Время работы"
+
+msgid "RX / TX"
+msgstr "RX / TX"
+
+msgid "MTU"
+msgstr "MTU"
+
+msgid "Podkop usage"
+msgstr "Использование Podkop"
+
+msgid "Connected"
+msgstr "Подключён"
+
+msgid "Disconnected"
+msgstr "Отключён"
+
+msgid "Connect"
+msgstr "Подключить"
+
+msgid "Disconnect"
+msgstr "Отключить"
+
+msgid "Restart"
+msgstr "Перезапустить"
+
+msgid "Edit"
+msgstr "Изменить"
+
+msgid "Logs"
+msgstr "Журналы"
+
+msgid "Not available"
+msgstr "Недоступно"
+
+msgid "Not determined"
+msgstr "Не определён"
+
+msgid "Not used"
+msgstr "Не используется"
+
+msgid "Source traffic"
+msgstr "Исходящий трафик"
+
+msgid "Selected outbound"
+msgstr "Выбранный выход"
+
+msgid "Podkop selected outbound"
+msgstr "Выбранный выход Podkop"
+
+msgid "Podkop domain rules"
+msgstr "Доменных правил Podkop"
+
+msgid "Podkop IP/subnet rules"
+msgstr "IP/подсетевых правил Podkop"
+
+msgid "No outbound WireGuard or AmneziaWG tunnels are configured."
+msgstr "Исходящие туннели WireGuard или AmneziaWG не настроены."
+
+msgid "The VPN tunnel command failed."
+msgstr "Не удалось выполнить команду VPN-туннеля."
+
+msgid "Traffic"
+msgstr "Трафик"
+
+msgid "LAN/Wi-Fi and remote AmneziaWG clients"
+msgstr "LAN/Wi-Fi и удалённые клиенты AmneziaWG"
+
+msgid "Direct"
+msgstr "Напрямую"
