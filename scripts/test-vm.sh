@@ -141,6 +141,24 @@ echo DASHBOARD_API_BEGIN
 /usr/libexec/vpn-dashboard-peer dashboard
 echo DASHBOARD_API_END
 /usr/libexec/vpn-dashboard-peer status >/tmp/vmpeer.status && ! grep -Eqi "private_key|preshared_key|privatekey|presharedkey|password|secret" /tmp/vmpeer.status && echo STATUS_SECRET_SAFE
+test "$(stat -c '%a' /etc/vpn-dashboard/peers/vmpeer)" = 600
+/sbin/sysupgrade -b /tmp/vm-backup.tar.gz
+for backup_path in \
+  etc/config/network \
+  etc/config/firewall \
+  etc/config/dhcp \
+  etc/config/podkop \
+  etc/config/vpn-dashboard \
+  etc/vpn-dashboard/peers/vmpeer; do
+  tar -tzf /tmp/vm-backup.tar.gz | grep -qx "$backup_path"
+done
+rm -f /tmp/vm-backup.tar.gz
+echo BACKUP_VALIDATION_PASS
+apk info -e podkop
+apk info -e kmod-amneziawg
+apk info -e luci-app-vpn-dashboard
+apk info podkop | grep -q '^podkop-'
+echo APK_PACKAGE_MANAGER_PASS
 sleep 55
 /usr/libexec/vpn-dashboard-peer enable vmpeer 0 && uci get vpn-dashboard.peer_vmpeer.enabled | grep -qx 0 && /usr/libexec/vpn-dashboard-peer enable vmpeer 1 && uci get vpn-dashboard.peer_vmpeer.enabled | grep -qx 1 && echo PEER_TOGGLE_PASS
 /usr/libexec/vpn-dashboard-peer delete vmpeer && ! uci -q get vpn-dashboard.peer_vmpeer && test ! -e /etc/vpn-dashboard/peers/vmpeer && echo PEER_DELETE_PASS
@@ -240,7 +258,7 @@ wait "$CONSOLE_PID" || true
 wait "$REMOTE_CONSOLE_PID" || true
 tr -d '\r' < "$RESULT_DIR/openwrt.serial.log" > "$RESULT_DIR/openwrt.serial.normalized.log"
 tr -d '\r' < "$RESULT_DIR/remote.serial.log" > "$RESULT_DIR/remote.serial.normalized.log"
-for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_NFT_SOURCE_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE PEER_TOGGLE_PASS PEER_DELETE_PASS GUEST_TEST_COMPLETE; do
+for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_NFT_SOURCE_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE BACKUP_VALIDATION_PASS APK_PACKAGE_MANAGER_PASS PEER_TOGGLE_PASS PEER_DELETE_PASS GUEST_TEST_COMPLETE; do
 	grep -Fxq "$marker" "$RESULT_DIR/openwrt.serial.normalized.log" || fail "guest runtime test failed: $marker"
 done
 for marker in REMOTE_AWG_CONFIG_PASS REMOTE_AWG_HANDSHAKE_PASS REMOTE_DNS_PASS; do
@@ -260,10 +278,12 @@ record PODKOP_NFT_SOURCE_INTERFACE PASS
 record PEER_MANAGEMENT PASS
 record QR_GENERATION PASS
 record SECRET_LEAK_TEST PASS
+record BACKUP_VALIDATION PASS
+record APK_PACKAGE_MANAGER PASS
 
 cat > "$RESULT_DIR/junit.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="openwrt-vm-smoke" tests="11" failures="0">
+<testsuite name="openwrt-vm-smoke" tests="13" failures="0">
   <testcase name="vm_boot"/>
   <testcase name="luci_http"/>
   <testcase name="vpn_dashboard_assets"/>
@@ -273,6 +293,8 @@ cat > "$RESULT_DIR/junit.xml" <<EOF
   <testcase name="remote_dns_via_router"/>
   <testcase name="podkop_nft_source_interface"/>
   <testcase name="peer_management_and_qr"/>
+  <testcase name="backup_contents_and_secret_permissions"/>
+  <testcase name="apk_installed_package_database"/>
   <testcase name="dashboard_public_assets_no_secret_names"/>
   <testcase name="dashboard_status_api_no_secret_names"/>
 </testsuite>
