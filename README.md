@@ -48,6 +48,10 @@ kernel 6.12. Поэтому Wi-Fi, mac80211, firmware, Ethernet и kernel ABI б
 routing. Обоснование и оба минимальных compatibility patch — в
 [`docs/HARDWARE_STACK.md`](docs/HARDWARE_STACK.md).
 
+Соответствие собственного VPN Dashboard пользовательским сценариям GL.iNet и
+осознанные границы без GL SDK описаны в
+[`docs/VPN_DASHBOARD_COMPARISON.md`](docs/VPN_DASHBOARD_COMPARISON.md).
+
 Аппаратный offload не включается принудительно. При Podkop/TProxy/VPN policy
 routing он может обходить правила. Сначала проверьте selective routing, затем
 при необходимости тестируйте software/hardware flow offload отдельно; при
