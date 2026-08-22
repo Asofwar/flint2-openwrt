@@ -54,6 +54,13 @@ function uptime(entry) {
 	return '%d h %d min'.format(Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60));
 }
 
+function lastHandshake(timestamp) {
+	if (!timestamp)
+		return _('Never');
+
+	return new Date(timestamp * 1000).toLocaleString();
+}
+
 function protocolName(protocol) {
 	return protocol === 'amneziawg' ? _('AmneziaWG') : _('WireGuard');
 }
@@ -95,7 +102,7 @@ function tunnelCard(tunnel, interfaces, dashboard) {
 		[ _('Virtual IP'), virtualAddress(state) ],
 		[ _('Exit IP'), _('Not determined') ],
 		[ _('Uptime'), uptime(state) ],
-		[ _('Last handshake'), _('Not available') ],
+		[ _('Last handshake'), lastHandshake(tunnel.last_handshake) ],
 		[ _('RX / TX'), traffic(state) ],
 		[ _('MTU'), tunnel.mtu || _('Not configured') ],
 		[ _('Podkop usage'), podkopUsage ]

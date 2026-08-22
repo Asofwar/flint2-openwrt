@@ -154,7 +154,7 @@ uci set network.wireguard_awg_out.endpoint_host=vpn.example.test
 uci set network.wireguard_awg_out.endpoint_port=51820
 uci commit network
 /usr/libexec/vpn-dashboard-peer dashboard >/tmp/vpn-dashboard.json
-jq -e ".tunnels[] | select(.name == \"awg_out\" and .protocol == \"amneziawg\" and .mtu == \"1280\" and .endpoint == \"vpn.example.test:51820\")" /tmp/vpn-dashboard.json >/dev/null
+jq -e ".tunnels[] | select(.name == \"awg_out\" and .protocol == \"amneziawg\" and .mtu == \"1280\" and .endpoint == \"vpn.example.test:51820\" and (.last_handshake | type) == \"number\")" /tmp/vpn-dashboard.json >/dev/null
 ! /usr/libexec/vpn-dashboard-tunnel up awg_server
 echo VPN_TUNNEL_DASHBOARD_PASS
 /usr/libexec/vpn-dashboard-peer create vmpeer full >/tmp/vmpeer.conf

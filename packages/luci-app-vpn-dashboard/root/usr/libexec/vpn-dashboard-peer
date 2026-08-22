@@ -215,7 +215,7 @@ podkop_rule_count() {
 }
 
 tunnel_status() {
-	local section="$1" proto disabled mtu endpoint endpoint_port
+	local section="$1" proto disabled mtu endpoint endpoint_port device handshake command
 	[ "$section" = "$server_interface" ] && return 0
 	valid_id "$section" || return 0
 	config_get proto "$section" proto
@@ -228,10 +228,20 @@ tunnel_status() {
 	case "$endpoint_port" in ''|*[!0-9]* ) endpoint_port='';; esac
 	[ -n "$endpoint" ] && [ -n "$endpoint_port" ] && endpoint="$endpoint:$endpoint_port"
 	case "$mtu" in ''|*[!0-9]* ) mtu='';; esac
+	device="$(ubus call network.interface."$section" status 2>/dev/null | jsonfilter -e '@.l3_device')"
+	case "$proto" in
+		wireguard) command='wg';;
+		amneziawg) command='awg';;
+	esac
+	handshake=''
+	if [ -n "$device" ] && command -v "$command" >/dev/null 2>&1; then
+		handshake="$("$command" show "$device" latest-handshakes 2>/dev/null | awk 'NF == 2 && $2 > latest { latest = $2 } END { print latest + 0 }')"
+	fi
+	case "$handshake" in ''|*[!0-9]* ) handshake=0;; esac
 	[ -z "$tunnel_json_first" ] || printf ','
 	tunnel_json_first=1
-	printf '{"name":"%s","protocol":"%s","disabled":%s,"mtu":"%s","endpoint":"%s"}' \
-		"$section" "$proto" "$([ "$disabled" = 1 ] && echo true || echo false)" "$mtu" "$endpoint"
+	printf '{"name":"%s","protocol":"%s","disabled":%s,"mtu":"%s","endpoint":"%s","last_handshake":%s}' \
+		"$section" "$proto" "$([ "$disabled" = 1 ] && echo true || echo false)" "$mtu" "$endpoint" "$handshake"
 }
 
 dashboard_status() {
