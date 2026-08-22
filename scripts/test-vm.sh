@@ -75,29 +75,15 @@ qemu-system-x86_64 \
 REMOTE_QEMU_PID=$!
 
 GUEST_COMMAND='modprobe amneziawg && ip link add awg_probe type amneziawg && awg show awg_probe >/dev/null && ip link del awg_probe && echo AWG_MODULE_PASS
-uci set network.peerlink=interface
-uci set network.peerlink.device=eth1
-uci set network.peerlink.proto=static
-uci set network.peerlink.ipaddr=192.0.2.1
-uci set network.peerlink.netmask=255.255.255.0
+uci set network.wan=interface
+uci set network.wan.device=eth1
+uci set network.wan.proto=static
+uci set network.wan.ipaddr=192.0.2.1
+uci set network.wan.netmask=255.255.255.0
 uci commit network
-ifup peerlink
+ifup wan
 ip link set eth1 up
 ip addr replace 192.0.2.1/24 dev eth1
-uci set firewall.vm_peerlink=zone
-uci set firewall.vm_peerlink.name=vm_peerlink
-uci set firewall.vm_peerlink.network=peerlink
-uci set firewall.vm_peerlink.input=ACCEPT
-uci set firewall.vm_peerlink.output=ACCEPT
-uci set firewall.vm_peerlink.forward=REJECT
-uci set firewall.vm_peerlink_awg_server=rule
-uci set firewall.vm_peerlink_awg_server.name=Allow-AmneziaWG-from-VM-peer
-uci set firewall.vm_peerlink_awg_server.src=vm_peerlink
-uci set firewall.vm_peerlink_awg_server.proto=udp
-uci set firewall.vm_peerlink_awg_server.dest_port=51820
-uci set firewall.vm_peerlink_awg_server.target=ACCEPT
-uci commit firewall
-/etc/init.d/firewall reload
 uci set vpn-dashboard.main.enabled=1
 uci set vpn-dashboard.main.endpoint_mode=manual
 uci set vpn-dashboard.main.endpoint_host=192.0.2.1
@@ -125,6 +111,18 @@ echo PODKOP_NFT_SOURCE_PASS
 /usr/libexec/vpn-dashboard-peer create vmpeer full >/tmp/vmpeer.conf
 cp /tmp/vmpeer.conf /www/vmpeer.conf
 chmod 0644 /www/vmpeer.conf
+uci delete uhttpd.main.listen_http
+uci add_list uhttpd.main.listen_http='192.0.2.1:8080'
+uci commit uhttpd
+/etc/init.d/uhttpd restart
+uci set firewall.vm_peer_export=rule
+uci set firewall.vm_peer_export.name='Allow-VM-peer-export'
+uci set firewall.vm_peer_export.src='wan'
+uci set firewall.vm_peer_export.proto='tcp'
+uci set firewall.vm_peer_export.dest_port='8080'
+uci set firewall.vm_peer_export.target='ACCEPT'
+uci commit firewall
+/etc/init.d/firewall reload
 echo REMOTE_EXPORT_READY
 sed -e "/^PrivateKey = /d" -e "/^PresharedKey = /d" /tmp/vmpeer.conf >/tmp/vmpeer.safe
 echo CLIENT_CONFIG_SAFE_BEGIN
@@ -186,10 +184,13 @@ ip addr add 192.0.2.2/24 dev eth0
 ip link set eth0 up
 sleep 3
 for attempt in $(seq 1 30); do
-  wget -qO /tmp/vmpeer.conf http://192.0.2.1/vmpeer.conf && grep -q "^PrivateKey = " /tmp/vmpeer.conf && grep -q "^PresharedKey = " /tmp/vmpeer.conf && break
+  wget -qO /tmp/vmpeer.conf http://192.0.2.1:8080/vmpeer.conf && grep -q "^PrivateKey = " /tmp/vmpeer.conf && grep -q "^PresharedKey = " /tmp/vmpeer.conf && break
   sleep 2
 done
 grep -q "^PrivateKey = " /tmp/vmpeer.conf && grep -q "^PresharedKey = " /tmp/vmpeer.conf
+! timeout 2 nc 192.0.2.1 80 </dev/null >/dev/null 2>&1
+! timeout 2 nc 192.0.2.1 22 </dev/null >/dev/null 2>&1
+echo FIREWALL_WAN_BLOCK_PASS
 client_private="$(sed -n "s/^PrivateKey = //p" /tmp/vmpeer.conf)"
 server_public="$(sed -n "s/^PublicKey = //p" /tmp/vmpeer.conf)"
 preshared_key="$(sed -n "s/^PresharedKey = //p" /tmp/vmpeer.conf)"
@@ -261,7 +262,7 @@ tr -d '\r' < "$RESULT_DIR/remote.serial.log" > "$RESULT_DIR/remote.serial.normal
 for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_NFT_SOURCE_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE BACKUP_VALIDATION_PASS APK_PACKAGE_MANAGER_PASS PEER_TOGGLE_PASS PEER_DELETE_PASS GUEST_TEST_COMPLETE; do
 	grep -Fxq "$marker" "$RESULT_DIR/openwrt.serial.normalized.log" || fail "guest runtime test failed: $marker"
 done
-for marker in REMOTE_AWG_CONFIG_PASS REMOTE_AWG_HANDSHAKE_PASS REMOTE_DNS_PASS; do
+for marker in FIREWALL_WAN_BLOCK_PASS REMOTE_AWG_CONFIG_PASS REMOTE_AWG_HANDSHAKE_PASS REMOTE_DNS_PASS; do
 	grep -Fxq "$marker" "$RESULT_DIR/remote.serial.normalized.log" || fail "remote guest runtime test failed: $marker"
 done
 awk '/^DASHBOARD_API_BEGIN$/{inside=1;next} /^DASHBOARD_API_END$/{inside=0} inside && /^\{.*\}$/{print}' "$RESULT_DIR/openwrt.serial.normalized.log" > "$RESULT_DIR/dashboard-api.json"
@@ -274,6 +275,7 @@ record AWG_MODULE PASS
 record AWG_SERVER PASS
 record REMOTE_AWG_HANDSHAKE PASS
 record REMOTE_DNS PASS
+record FIREWALL_WAN PASS
 record PODKOP_NFT_SOURCE_INTERFACE PASS
 record PEER_MANAGEMENT PASS
 record QR_GENERATION PASS
@@ -283,7 +285,7 @@ record APK_PACKAGE_MANAGER PASS
 
 cat > "$RESULT_DIR/junit.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="openwrt-vm-smoke" tests="13" failures="0">
+<testsuite name="openwrt-vm-smoke" tests="14" failures="0">
   <testcase name="vm_boot"/>
   <testcase name="luci_http"/>
   <testcase name="vpn_dashboard_assets"/>
@@ -291,6 +293,7 @@ cat > "$RESULT_DIR/junit.xml" <<EOF
   <testcase name="amneziawg_server"/>
   <testcase name="remote_awg_handshake"/>
   <testcase name="remote_dns_via_router"/>
+  <testcase name="wan_blocks_http_and_ssh_while_awg_handshakes"/>
   <testcase name="podkop_nft_source_interface"/>
   <testcase name="peer_management_and_qr"/>
   <testcase name="backup_contents_and_secret_permissions"/>
