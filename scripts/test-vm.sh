@@ -74,7 +74,8 @@ qemu-system-x86_64 \
 	-no-reboot > "$RESULT_DIR/remote-qemu.log" 2>&1 &
 REMOTE_QEMU_PID=$!
 
-GUEST_COMMAND='modprobe amneziawg && ip link add awg_probe type amneziawg && awg show awg_probe >/dev/null && ip link del awg_probe && echo AWG_MODULE_PASS
+GUEST_COMMAND='set -e
+modprobe amneziawg && ip link add awg_probe type amneziawg && awg show awg_probe >/dev/null && ip link del awg_probe && echo AWG_MODULE_PASS
 uci set network.wan=interface
 uci set network.wan.device=eth1
 uci set network.wan.proto=static
@@ -109,7 +110,9 @@ grep -qw "$device" /tmp/podkop-interfaces.nft
 rm -f /tmp/podkop-interfaces.nft
 echo PODKOP_NFT_SOURCE_PASS
 /usr/libexec/vpn-dashboard-peer create vmpeer full >/tmp/vmpeer.conf
+/usr/libexec/vpn-dashboard-peer create vmpeer2 full >/tmp/vmpeer2.conf
 cp /tmp/vmpeer.conf /www/vmpeer.conf
+cp /tmp/vmpeer2.conf /www/vmpeer2.conf
 chmod 0644 /www/vmpeer.conf
 uci delete uhttpd.main.listen_http
 uci add_list uhttpd.main.listen_http='192.0.2.1:8080'
@@ -139,7 +142,8 @@ echo DASHBOARD_API_BEGIN
 /usr/libexec/vpn-dashboard-peer dashboard
 echo DASHBOARD_API_END
 /usr/libexec/vpn-dashboard-peer status >/tmp/vmpeer.status && ! grep -Eqi "private_key|preshared_key|privatekey|presharedkey|password|secret" /tmp/vmpeer.status && echo STATUS_SECRET_SAFE
-test "$(stat -c '%a' /etc/vpn-dashboard/peers/vmpeer)" = 600
+test "$(ls -ld /etc/vpn-dashboard/peers/vmpeer | awk "{print \$1}")" = '-rw-------'
+test "$(ls -ld /etc/vpn-dashboard/peers/vmpeer2 | awk "{print \$1}")" = '-rw-------'
 /sbin/sysupgrade -b /tmp/vm-backup.tar.gz
 for backup_path in \
   etc/config/network \
@@ -147,7 +151,8 @@ for backup_path in \
   etc/config/dhcp \
   etc/config/podkop \
   etc/config/vpn-dashboard \
-  etc/vpn-dashboard/peers/vmpeer; do
+  etc/vpn-dashboard/peers/vmpeer \
+  etc/vpn-dashboard/peers/vmpeer2; do
   tar -tzf /tmp/vm-backup.tar.gz | grep -qx "$backup_path"
 done
 rm -f /tmp/vm-backup.tar.gz
@@ -157,10 +162,10 @@ apk info -e kmod-amneziawg
 apk info -e luci-app-vpn-dashboard
 apk info podkop | grep -q '^podkop-'
 echo APK_PACKAGE_MANAGER_PASS
-sleep 55
+sleep 100
 /usr/libexec/vpn-dashboard-peer enable vmpeer 0 && uci get vpn-dashboard.peer_vmpeer.enabled | grep -qx 0 && /usr/libexec/vpn-dashboard-peer enable vmpeer 1 && uci get vpn-dashboard.peer_vmpeer.enabled | grep -qx 1 && echo PEER_TOGGLE_PASS
-/usr/libexec/vpn-dashboard-peer delete vmpeer && ! uci -q get vpn-dashboard.peer_vmpeer && test ! -e /etc/vpn-dashboard/peers/vmpeer && echo PEER_DELETE_PASS
-rm -f /tmp/vmpeer.conf /tmp/vmpeer.safe /tmp/vmpeer.fields /tmp/vmpeer.qr /tmp/vmpeer.status
+/usr/libexec/vpn-dashboard-peer delete vmpeer && /usr/libexec/vpn-dashboard-peer delete vmpeer2 && ! uci -q get vpn-dashboard.peer_vmpeer && ! uci -q get vpn-dashboard.peer_vmpeer2 && test ! -e /etc/vpn-dashboard/peers/vmpeer && test ! -e /etc/vpn-dashboard/peers/vmpeer2 && echo PEER_DELETE_PASS
+rm -f /tmp/vmpeer.conf /tmp/vmpeer2.conf /tmp/vmpeer.safe /tmp/vmpeer.fields /tmp/vmpeer.qr /tmp/vmpeer.status
 echo GUEST_TEST_COMPLETE'
 (
 	sleep 35
@@ -171,8 +176,8 @@ echo GUEST_TEST_COMPLETE'
 			printf '%s\n' "$line"
 			sleep 0.2
 		done
-		sleep 130
-	) | timeout 210 nc -N 127.0.0.1 "$SERIAL_PORT"
+		sleep 180
+	) | timeout 300 nc -N 127.0.0.1 "$SERIAL_PORT"
 ) > "$RESULT_DIR/openwrt.serial.log" 2>&1 &
 CONSOLE_PID=$!
 
@@ -213,9 +218,28 @@ ping -c 1 -W 2 10.77.0.1 >/tmp/remote-ping.txt || true
 sleep 10
 awg show awg_remote latest-handshakes | awk "NF == 2 && \$2 > 0 { found=1 } END { exit !found }"
 echo REMOTE_AWG_HANDSHAKE_PASS
+for attempt in $(seq 1 30); do
+  wget -qO /tmp/vmpeer2.conf http://192.0.2.1:8080/vmpeer2.conf && grep -q "^PrivateKey = " /tmp/vmpeer2.conf && grep -q "^PresharedKey = " /tmp/vmpeer2.conf && break
+  sleep 2
+done
+client_private2="$(sed -n "s/^PrivateKey = //p" /tmp/vmpeer2.conf)"
+server_public2="$(sed -n "s/^PublicKey = //p" /tmp/vmpeer2.conf)"
+preshared_key2="$(sed -n "s/^PresharedKey = //p" /tmp/vmpeer2.conf)"
+test -n "$client_private2" && test -n "$server_public2" && test -n "$preshared_key2"
+printf '%s' "$client_private2" >/tmp/vm-remote2-private.key
+printf '%s' "$preshared_key2" >/tmp/vm-remote2-psk.key
+ip link add awg_remote2 type amneziawg
+awg set awg_remote2 private-key /tmp/vm-remote2-private.key peer "$server_public2" preshared-key /tmp/vm-remote2-psk.key allowed-ips 0.0.0.0/0 endpoint 192.0.2.1:51820 persistent-keepalive 5
+ip addr add 10.77.0.3/24 dev awg_remote2
+ip link set awg_remote2 up
+ip route replace 10.77.0.3/32 dev awg_remote
+sleep 10
+awg show awg_remote2 latest-handshakes | awk "NF == 2 && \$2 > 0 { found=1 } END { exit !found }"
+! ping -I awg_remote -c 1 -W 2 10.77.0.3 >/tmp/remote-isolation.txt 2>&1
+echo CLIENT_ISOLATION_PASS
 nslookup localhost 10.77.0.1 >/tmp/remote-dns.txt
 echo REMOTE_DNS_PASS
-rm -f /tmp/vmpeer.conf /tmp/remote-ping.txt /tmp/remote-dns.txt /tmp/vm-remote-private.key /tmp/vm-remote-psk.key'
+rm -f /tmp/vmpeer.conf /tmp/vmpeer2.conf /tmp/remote-ping.txt /tmp/remote-isolation.txt /tmp/remote-dns.txt /tmp/vm-remote-private.key /tmp/vm-remote-psk.key /tmp/vm-remote2-private.key /tmp/vm-remote2-psk.key'
 (
 	sleep 62
 	(
@@ -226,8 +250,8 @@ rm -f /tmp/vmpeer.conf /tmp/remote-ping.txt /tmp/remote-dns.txt /tmp/vm-remote-p
 			printf 'printf %%s %s | base64 -d >>/tmp/vm-remote-test.sh\n' "$chunk"
 		done
 		printf 'sh -e /tmp/vm-remote-test.sh; status=$?; rm -f /tmp/vm-remote-test.sh; exit $status\n'
-		sleep 25
-	) | timeout 130 nc -N 127.0.0.1 "$REMOTE_SERIAL_PORT"
+		sleep 80
+	) | timeout 210 nc -N 127.0.0.1 "$REMOTE_SERIAL_PORT"
 ) > "$RESULT_DIR/remote.serial.log" 2>&1 &
 REMOTE_CONSOLE_PID=$!
 
@@ -262,7 +286,7 @@ tr -d '\r' < "$RESULT_DIR/remote.serial.log" > "$RESULT_DIR/remote.serial.normal
 for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_NFT_SOURCE_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE BACKUP_VALIDATION_PASS APK_PACKAGE_MANAGER_PASS PEER_TOGGLE_PASS PEER_DELETE_PASS GUEST_TEST_COMPLETE; do
 	grep -Fxq "$marker" "$RESULT_DIR/openwrt.serial.normalized.log" || fail "guest runtime test failed: $marker"
 done
-for marker in FIREWALL_WAN_BLOCK_PASS REMOTE_AWG_CONFIG_PASS REMOTE_AWG_HANDSHAKE_PASS REMOTE_DNS_PASS; do
+for marker in FIREWALL_WAN_BLOCK_PASS REMOTE_AWG_CONFIG_PASS REMOTE_AWG_HANDSHAKE_PASS CLIENT_ISOLATION_PASS REMOTE_DNS_PASS; do
 	grep -Fxq "$marker" "$RESULT_DIR/remote.serial.normalized.log" || fail "remote guest runtime test failed: $marker"
 done
 awk '/^DASHBOARD_API_BEGIN$/{inside=1;next} /^DASHBOARD_API_END$/{inside=0} inside && /^\{.*\}$/{print}' "$RESULT_DIR/openwrt.serial.normalized.log" > "$RESULT_DIR/dashboard-api.json"
@@ -276,6 +300,7 @@ record AWG_SERVER PASS
 record REMOTE_AWG_HANDSHAKE PASS
 record REMOTE_DNS PASS
 record FIREWALL_WAN PASS
+record CLIENT_ISOLATION PASS
 record PODKOP_NFT_SOURCE_INTERFACE PASS
 record PEER_MANAGEMENT PASS
 record QR_GENERATION PASS
@@ -285,7 +310,7 @@ record APK_PACKAGE_MANAGER PASS
 
 cat > "$RESULT_DIR/junit.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="openwrt-vm-smoke" tests="14" failures="0">
+<testsuite name="openwrt-vm-smoke" tests="15" failures="0">
   <testcase name="vm_boot"/>
   <testcase name="luci_http"/>
   <testcase name="vpn_dashboard_assets"/>
@@ -294,6 +319,7 @@ cat > "$RESULT_DIR/junit.xml" <<EOF
   <testcase name="remote_awg_handshake"/>
   <testcase name="remote_dns_via_router"/>
   <testcase name="wan_blocks_http_and_ssh_while_awg_handshakes"/>
+  <testcase name="awg_peer_isolation_blocks_peer_to_peer_traffic"/>
   <testcase name="podkop_nft_source_interface"/>
   <testcase name="peer_management_and_qr"/>
   <testcase name="backup_contents_and_secret_permissions"/>
