@@ -2,6 +2,41 @@
 set -Eeuo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VM_TEST_SUITE="${VM_TEST_SUITE:-runtime}"
+
+if [ "$VM_TEST_SUITE" = 'all' ]; then
+	SUITE_RUN_ID="${VM_TEST_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
+	SUITE_RESULT_DIR="$PROJECT_DIR/artifacts/test-results/$SUITE_RUN_ID"
+	mkdir -p "$SUITE_RESULT_DIR"
+	printf 'VIRTUAL_FULL_SUITE=RUNNING\n' > "$SUITE_RESULT_DIR/summary.txt"
+	VM_TEST_SUITE=runtime VM_TEST_RUN_ID="$SUITE_RUN_ID-runtime" bash "$0"
+	VM_AWG_OUT_TEST_RUN_ID="$SUITE_RUN_ID-awg-out" bash "$PROJECT_DIR/scripts/test-vm-awg-out.sh"
+	VM_PODKOP_POLICY_TEST_RUN_ID="$SUITE_RUN_ID-podkop-policy" bash "$PROJECT_DIR/scripts/test-vm-podkop-policy.sh"
+	for summary in \
+		"$PROJECT_DIR/artifacts/test-results/$SUITE_RUN_ID-runtime/summary.txt" \
+		"$PROJECT_DIR/artifacts/test-results/$SUITE_RUN_ID-awg-out/summary.txt" \
+		"$PROJECT_DIR/artifacts/test-results/$SUITE_RUN_ID-podkop-policy/summary.txt"; do
+		test -f "$summary" || { echo "VM TEST FAILED: missing suite summary: $summary" >&2; exit 1; }
+		cat "$summary" >> "$SUITE_RESULT_DIR/summary.txt"
+	done
+	grep -Fxq 'VIRTUAL_RUNTIME_VALIDATION=PASS' "$SUITE_RESULT_DIR/summary.txt"
+	grep -Fxq 'VIRTUAL_AWG_OUT_VALIDATION=PASS' "$SUITE_RESULT_DIR/summary.txt"
+	grep -Fxq 'VIRTUAL_PODKOP_POLICY_VALIDATION=PASS' "$SUITE_RESULT_DIR/summary.txt"
+	cat > "$SUITE_RESULT_DIR/junit.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="flint2-openwrt-vm-full-suite" tests="3" failures="0">
+  <testcase name="runtime_smoke_and_reboot"/>
+  <testcase name="awg_outbound"/>
+  <testcase name="podkop_same_policy"/>
+</testsuite>
+EOF
+	printf 'VIRTUAL_FULL_SUITE=PASS\n' >> "$SUITE_RESULT_DIR/summary.txt"
+	echo "VM FULL SUITE PASS: $SUITE_RESULT_DIR"
+	exit 0
+fi
+
+[ "$VM_TEST_SUITE" = 'runtime' ] || { echo "VM TEST FAILED: unknown VM_TEST_SUITE=$VM_TEST_SUITE" >&2; exit 1; }
+
 IMAGE="${VM_IMAGE:-$(find "$PROJECT_DIR/artifacts/vm" -maxdepth 1 -type f -name '*squashfs-combined.img.gz' -print -quit)}"
 RUN_ID="${VM_TEST_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 RESULT_DIR="$PROJECT_DIR/artifacts/test-results/$RUN_ID"

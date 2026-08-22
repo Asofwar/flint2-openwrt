@@ -1,12 +1,15 @@
 [CmdletBinding()]
 param(
     [string]$TestImage = 'flint2-openwrt-vm-test:25.12.5',
-    [string]$RunId
+    [string]$RunId,
+    [ValidateSet('all', 'runtime')]
+    [string]$Suite = 'all'
 )
 
 $ErrorActionPreference = 'Stop'
 $ProjectPath = (Resolve-Path $PSScriptRoot).Path
 $EnvironmentArguments = @()
+$EnvironmentArguments += @('--env', "VM_TEST_SUITE=$Suite")
 if ($RunId) {
     $EnvironmentArguments += @('--env', "VM_TEST_RUN_ID=$RunId")
 }

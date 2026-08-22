@@ -97,8 +97,11 @@ Podkop и target-совместимого `kmod-amneziawg` без доступа
 ```
 
 Первая команда создаёт артефакты только в `artifacts/vm/`; вторая запускает
-образ в QEMU-контейнере и сохраняет serial log, HTTP-ответы, summary и JUnit в
-`artifacts/test-results/<UTC timestamp>/`. QEMU smoke-test не касается
+полный QEMU-набор: базовый runtime/reboot, внешний AmneziaWG outbound и
+сравнение Same as LAN / Podkop. Итоги каждого сценария и общий `summary` с
+JUnit сохраняются в `artifacts/test-results/<UTC timestamp>/`. Для быстрого
+только базового smoke-теста используйте `./test-vm.ps1 -Suite runtime`. QEMU
+набор не касается
 GL-MT6000, GitHub Actions и опубликованных release assets.
 
 ## GitHub Actions
