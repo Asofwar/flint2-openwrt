@@ -1,0 +1,74 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Андрей Зубченко <Asofwar@users.noreply.github.com>
+Date: Sat, 22 Aug 2026 11:15:00 +0300
+Subject: [PATCH] podkop: привязать direct-out к выбранному интерфейсу
+
+`output_network_interface` ранее превращался в глобальный
+`route.default_interface`. Это конфликтует с VPN outbound, у которого уже
+задан собственный `bind_interface`: sing-box получает две несовместимые
+привязки сокета. Привязываем только `direct-out` к настроенному egress и
+оставляем глобальную маршрутизацию в автоматическом режиме.
+---
+ podkop/files/usr/bin/podkop                     | 11 ++++-------
+ podkop/files/usr/lib/sing_box_config_manager.sh |  8 ++++++--
+ 2 files changed, 10 insertions(+), 9 deletions(-)
+
+diff --git a/podkop/files/usr/lib/sing_box_config_manager.sh b/podkop/files/usr/lib/sing_box_config_manager.sh
+index 3e8c436..0000000 100644
+--- a/podkop/files/usr/lib/sing_box_config_manager.sh
++++ b/podkop/files/usr/lib/sing_box_config_manager.sh
+@@ -431,20 +431,23 @@ sing_box_cm_add_direct_outbound() {
+ # Add a Direct outbound to the outbounds section of a sing-box JSON configuration.
+ # Arguments:
+ #   config: string (JSON), sing-box configuration to modify
+ #   tag: string, identifier for the outbound
++#   interface: optional network interface to bind the outbound
+ # Outputs:
+ #   Writes updated JSON configuration to stdout
+ # Example:
+ #   CONFIG=$(sing_box_cm_add_direct_outbound "$CONFIG" "direct-out")
+ #######################################
+ sing_box_cm_add_direct_outbound() {
+     local config="$1"
+     local tag="$2"
++    local interface="$3"
+ 
+     echo "$config" | jq \
+         --arg tag "$tag" \
++        --arg interface "$interface" \
+         '.outbounds += [{
+             type: "direct",
+             tag: $tag
+-        }]'
++        } + (if $interface != "" then {bind_interface: $interface} else {} end)]'
+ }
+diff --git a/podkop/files/usr/bin/podkop b/podkop/files/usr/bin/podkop
+index 7331d55..0000000 100755
+--- a/podkop/files/usr/bin/podkop
++++ b/podkop/files/usr/bin/podkop
+@@ -614,6 +614,9 @@ sing_box_configure_outbounds() {
+     log "Configure the outbounds section of a sing-box JSON configuration"
+ 
+-    config=$(sing_box_cm_add_direct_outbound "$config" "$SB_DIRECT_OUTBOUND_TAG")
++    local output_network_interface
++    config_get output_network_interface "settings" "output_network_interface"
++
++    config=$(sing_box_cm_add_direct_outbound "$config" "$SB_DIRECT_OUTBOUND_TAG" "$output_network_interface")
+ 
+     config_foreach configure_outbound_handler "section"
+ }
+@@ -796,12 +799,5 @@ sing_box_configure_route() {
+ sing_box_configure_route() {
+     log "Configure the route section of a sing-box JSON configuration"
+ 
+-    local output_network_interface
+-    config_get output_network_interface "settings" "output_network_interface"
+-    if [ -z "$output_network_interface" ]; then
+-        config=$(sing_box_cm_configure_route "$config" "$SB_DIRECT_OUTBOUND_TAG" true "$SB_DNS_SERVER_TAG")
+-    else
+-        config=$(sing_box_cm_configure_route "$config" "$SB_DIRECT_OUTBOUND_TAG" false "$SB_DNS_SERVER_TAG" \
+-            "$output_network_interface")
+-    fi
++    config=$(sing_box_cm_configure_route "$config" "$SB_DIRECT_OUTBOUND_TAG" true "$SB_DNS_SERVER_TAG")
+ 
+     local sniff_inbounds

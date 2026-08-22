@@ -50,6 +50,15 @@ else
 	echo "Podkop compatibility patch does not apply to the pinned source" >&2
 	exit 1
 fi
+PODKOP_EGRESS_PATCH="$PROJECT_DIR/patches/podkop/0002-bind-direct-outbound-to-configured-egress.patch"
+if git -C feeds/podkop apply --reverse --check "$PODKOP_EGRESS_PATCH" 2>/dev/null; then
+	:
+elif git -C feeds/podkop apply --check "$PODKOP_EGRESS_PATCH" 2>/dev/null; then
+	git -C feeds/podkop apply "$PODKOP_EGRESS_PATCH"
+else
+	echo "Podkop egress patch does not apply to the pinned source" >&2
+	exit 1
+fi
 ./scripts/feeds install -a -p awg
 ./scripts/feeds install -a -p podkop
 ./scripts/feeds install luci luci-ssl-openssl luci-app-firewall luci-app-package-manager luci-app-ttyd luci-app-commands luci-app-statistics luci-app-sqm luci-app-upnp luci-app-ddns luci-app-vpn-dashboard luci-proto-wireguard luci-proto-ppp mtr-json iputils-ping iputils-tracepath qrencode
