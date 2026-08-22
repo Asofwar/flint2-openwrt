@@ -101,9 +101,11 @@ Podkop и target-совместимого `kmod-amneziawg` без доступа
 ```
 
 Первая команда создаёт артефакты только в `artifacts/vm/`; вторая запускает
-полный QEMU-набор: базовый runtime/reboot, внешний AmneziaWG outbound и
-сравнение Same as LAN / Podkop. Итоги каждого сценария и общий `summary` с
-JUnit сохраняются в `artifacts/test-results/<UTC timestamp>/`. Для быстрого
+полный QEMU-набор: базовый runtime/reboot, внешний AmneziaWG outbound,
+сравнение Same as LAN / Podkop и изолированное создание/восстановление
+резервной копии через штатные `sysupgrade -b`/`sysupgrade -r`. Итоги каждого
+сценария и общий `summary` с JUnit сохраняются в
+`artifacts/test-results/<UTC timestamp>/`. Для быстрого
 только базового smoke-теста используйте `./test-vm.ps1 -Suite runtime`. QEMU
 набор не касается
 GL-MT6000, GitHub Actions и опубликованных release assets.

@@ -12,22 +12,26 @@ if [ "$VM_TEST_SUITE" = 'all' ]; then
 	VM_TEST_SUITE=runtime VM_TEST_RUN_ID="$SUITE_RUN_ID-runtime" bash "$0"
 	VM_AWG_OUT_TEST_RUN_ID="$SUITE_RUN_ID-awg-out" bash "$PROJECT_DIR/scripts/test-vm-awg-out.sh"
 	VM_PODKOP_POLICY_TEST_RUN_ID="$SUITE_RUN_ID-podkop-policy" bash "$PROJECT_DIR/scripts/test-vm-podkop-policy.sh"
+	VM_BACKUP_RESTORE_TEST_RUN_ID="$SUITE_RUN_ID-backup-restore" bash "$PROJECT_DIR/scripts/test-vm-backup-restore.sh"
 	for summary in \
 		"$PROJECT_DIR/artifacts/test-results/$SUITE_RUN_ID-runtime/summary.txt" \
 		"$PROJECT_DIR/artifacts/test-results/$SUITE_RUN_ID-awg-out/summary.txt" \
-		"$PROJECT_DIR/artifacts/test-results/$SUITE_RUN_ID-podkop-policy/summary.txt"; do
+		"$PROJECT_DIR/artifacts/test-results/$SUITE_RUN_ID-podkop-policy/summary.txt" \
+		"$PROJECT_DIR/artifacts/test-results/$SUITE_RUN_ID-backup-restore/summary.txt"; do
 		test -f "$summary" || { echo "VM TEST FAILED: missing suite summary: $summary" >&2; exit 1; }
 		cat "$summary" >> "$SUITE_RESULT_DIR/summary.txt"
 	done
 	grep -Fxq 'VIRTUAL_RUNTIME_VALIDATION=PASS' "$SUITE_RESULT_DIR/summary.txt"
 	grep -Fxq 'VIRTUAL_AWG_OUT_VALIDATION=PASS' "$SUITE_RESULT_DIR/summary.txt"
 	grep -Fxq 'VIRTUAL_PODKOP_POLICY_VALIDATION=PASS' "$SUITE_RESULT_DIR/summary.txt"
+	grep -Fxq 'VIRTUAL_BACKUP_RESTORE_VALIDATION=PASS' "$SUITE_RESULT_DIR/summary.txt"
 	cat > "$SUITE_RESULT_DIR/junit.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="flint2-openwrt-vm-full-suite" tests="3" failures="0">
+<testsuite name="flint2-openwrt-vm-full-suite" tests="4" failures="0">
   <testcase name="runtime_smoke_and_reboot"/>
   <testcase name="awg_outbound"/>
   <testcase name="podkop_same_policy"/>
+  <testcase name="backup_restore"/>
 </testsuite>
 EOF
 	printf 'VIRTUAL_FULL_SUITE=PASS\n' >> "$SUITE_RESULT_DIR/summary.txt"
