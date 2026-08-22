@@ -86,7 +86,9 @@ return view.extend({
 			E('p', {}, [
 				E('a', { 'class': 'btn cbi-button cbi-button-action', 'href': L.url('admin', 'vpn', 'amneziawg-server') }, _('Configure AmneziaWG server')),
 				' ',
-				E('a', { 'class': 'btn cbi-button cbi-button-action', 'href': L.url('admin', 'services', 'podkop') }, _('Configure Podkop'))
+				E('a', { 'class': 'btn cbi-button cbi-button-action', 'href': L.url('admin', 'services', 'podkop') }, _('Configure Podkop')),
+				' ',
+				E('a', { 'class': 'btn cbi-button cbi-button-action', 'href': L.url('admin', 'vpn', 'logs') }, _('VPN Logs'))
 			])
 		]);
 	}

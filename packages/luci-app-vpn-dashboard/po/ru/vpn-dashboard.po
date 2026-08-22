@@ -267,3 +267,27 @@ msgstr "Не удалось получить состояние VPN peers."
 
 msgid "The WAN address is private or CGNAT. Incoming AmneziaWG connections may not be reachable directly."
 msgstr "WAN-адрес является частным или CGNAT. Входящие подключения AmneziaWG могут быть недоступны напрямую."
+
+msgid "VPN Logs"
+msgstr "Журнал VPN"
+
+msgid "Unable to read VPN logs."
+msgstr "Не удалось прочитать журнал VPN."
+
+msgid "All VPN components"
+msgstr "Все компоненты VPN"
+
+msgid "AmneziaWG server"
+msgstr "Сервер AmneziaWG"
+
+msgid "Podkop and sing-box"
+msgstr "Podkop и sing-box"
+
+msgid "WireGuard and AmneziaWG"
+msgstr "WireGuard и AmneziaWG"
+
+msgid "No matching log entries."
+msgstr "Подходящих записей журнала нет."
+
+msgid "Only VPN-related system logs are shown. Lines containing credentials or keys are excluded."
+msgstr "Показываются только системные журналы VPN. Строки с учётными данными или ключами исключены."

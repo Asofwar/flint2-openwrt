@@ -1,0 +1,14 @@
+#!/bin/sh
+
+case "$1" in
+	server) pattern='vpn-dashboard|amneziawg';;
+	podkop) pattern='podkop|sing-box';;
+	wireguard) pattern='wireguard|amneziawg';;
+	all|'') pattern='vpn-dashboard|podkop|sing-box|wireguard|amneziawg';;
+	*) exit 1;;
+esac
+
+logread 2>/dev/null \
+	| grep -Ei "$pattern" \
+	| grep -Evi 'private[_ -]?key|preshared|password|secret|authorization:' \
+	| tail -n 200

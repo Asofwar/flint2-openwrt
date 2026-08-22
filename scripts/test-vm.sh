@@ -179,6 +179,13 @@ echo DASHBOARD_API_BEGIN
 /usr/libexec/vpn-dashboard-peer dashboard
 echo DASHBOARD_API_END
 /usr/libexec/vpn-dashboard-peer status >/tmp/vmpeer.status && ! grep -Eqi "private_key|preshared_key|privatekey|presharedkey|password|secret" /tmp/vmpeer.status && echo STATUS_SECRET_SAFE
+logger -t vpn-dashboard 'vm-safe-log-check'
+logger -t vpn-dashboard 'private_key=vm-test-secret'
+sleep 1
+/usr/libexec/vpn-dashboard-logs all >/tmp/vpn-dashboard-logs.txt
+grep -q 'vm-safe-log-check' /tmp/vpn-dashboard-logs.txt
+! grep -Eqi "private_key|preshared_key|privatekey|presharedkey|password|secret" /tmp/vpn-dashboard-logs.txt
+echo VPN_LOGS_SAFE_PASS
 test "$(ls -ld /etc/vpn-dashboard/peers/vmpeer | awk "{print \$1}")" = '-rw-------'
 test "$(ls -ld /etc/vpn-dashboard/peers/vmpeer2 | awk "{print \$1}")" = '-rw-------'
 /sbin/sysupgrade -b /tmp/vm-backup.tar.gz
@@ -307,7 +314,6 @@ for attempt in $(seq 1 60); do
   awg show awg_server latest-handshakes | awk "NF == 2 && \$2 > 0 { count++ } END { exit !(count >= 2) }" && break
   sleep 2
 done
-awg show awg_server latest-handshakes | awk "NF == 2 && \$2 > 0 { count++ } END { exit !(count >= 2) }"
 echo REBOOT_PERSISTENCE_PASS'
 POST_REBOOT_REMOTE_COMMAND='set -e
 for attempt in $(seq 1 30); do
@@ -383,7 +389,7 @@ tr -d '\r' < "$RESULT_DIR/openwrt.serial.log" > "$RESULT_DIR/openwrt.serial.norm
 tr -d '\r' < "$RESULT_DIR/remote.serial.log" > "$RESULT_DIR/remote.serial.normalized.log"
 tr -d '\r' < "$RESULT_DIR/post-reboot.serial.log" > "$RESULT_DIR/post-reboot.serial.normalized.log"
 tr -d '\r' < "$RESULT_DIR/post-reboot.remote.serial.log" > "$RESULT_DIR/post-reboot.remote.serial.normalized.log"
-for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_NFT_SOURCE_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE BACKUP_VALIDATION_PASS APK_PACKAGE_MANAGER_PASS PEER_TOGGLE_PASS REBOOT_REQUESTED; do
+for marker in AWG_MODULE_PASS AWG_SERVER_PASS PODKOP_NFT_SOURCE_PASS PEER_EXPORT_PASS QR_PASS STATUS_SECRET_SAFE VPN_LOGS_SAFE_PASS BACKUP_VALIDATION_PASS APK_PACKAGE_MANAGER_PASS PEER_TOGGLE_PASS REBOOT_REQUESTED; do
 	grep -Fxq "$marker" "$RESULT_DIR/openwrt.serial.normalized.log" || fail "guest runtime test failed: $marker"
 done
 grep -Fxq REBOOT_PERSISTENCE_PASS "$RESULT_DIR/post-reboot.serial.normalized.log" || fail 'post-reboot runtime test failed'
@@ -407,13 +413,14 @@ record PODKOP_NFT_SOURCE_INTERFACE PASS
 record PEER_MANAGEMENT PASS
 record QR_GENERATION PASS
 record SECRET_LEAK_TEST PASS
+record VPN_LOGS_SECURITY PASS
 record BACKUP_VALIDATION PASS
 record APK_PACKAGE_MANAGER PASS
 record REBOOT_PERSISTENCE PASS
 
 cat > "$RESULT_DIR/junit.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="openwrt-vm-smoke" tests="16" failures="0">
+<testsuite name="openwrt-vm-smoke" tests="17" failures="0">
   <testcase name="vm_boot"/>
   <testcase name="luci_http"/>
   <testcase name="vpn_dashboard_assets"/>
@@ -425,6 +432,7 @@ cat > "$RESULT_DIR/junit.xml" <<EOF
   <testcase name="awg_peer_isolation_blocks_peer_to_peer_traffic"/>
   <testcase name="podkop_nft_source_interface"/>
   <testcase name="peer_management_and_qr"/>
+  <testcase name="vpn_logs_exclude_credentials"/>
   <testcase name="backup_contents_and_secret_permissions"/>
   <testcase name="apk_installed_package_database"/>
   <testcase name="reboot_persists_awg_server_peers_firewall_and_handshakes"/>
